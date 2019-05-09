@@ -1,0 +1,39 @@
+{
+  "name": "vectormap",
+  "version": "0.0.1",
+  "description": "Basic vector tile rendering with Canvas 2D",
+  "main": "dist/vectormap.bundle.js",
+  "files": [
+    "dist"
+  ],
+  "directories": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "rollup -c build/rollup.config.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jjhembd/vectormap.git"
+  },
+  "keywords": [
+    "vector",
+    "tile",
+    "map",
+    "canvas"
+  ],
+  "author": "Jeshurun Hembd",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jjhembd/vectormap/issues"
+  },
+  "homepage": "https://github.com/jjhembd/vectormap#readme",
+  "devDependencies": {
+    "http-server": "^0.11.1",
+    "rollup": "^1.11.3",
+    "rollup-plugin-node-resolve": "^4.2.3"
+  },
+  "dependencies": {
+    "@mapbox/vector-tile": "^1.3.1",
+    "d3-geo": "^1.11.3"
+  }
+}
