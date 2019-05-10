@@ -559,9 +559,9 @@ function index(projection, context) {
 
 //import * as topojson from 'topojson-client';
 
-function init(div, data) {
+function init(div, dataHref) {
   // Input div is the ID of an HTML div where the map will be rendered
-  // Input data is a GeoJSON object
+  // Input dataHref is the path to a file containing GeoJSON
 
   // Initialize the canvas and rendering context
   const ctx = initDisplay(div);
@@ -570,6 +570,20 @@ function init(div, data) {
   // First param is the projection. Keep the data's native coordinates for now
   var path = index(null, ctx);
 
+  // Get the data
+  var request = new XMLHttpRequest();
+  request.onload = drawData;
+  request.onerror = requestError;
+  request.open('get', dataHref);
+  request.send();
+
+  function drawData() {
+    var data = JSON.parse(this.responseText);
+    draw(ctx, path, data);
+  }
+}
+
+function draw(ctx, path, data) {
   // Set up the drawing path and parameters
   ctx.beginPath();
   path(data);
@@ -578,6 +592,10 @@ function init(div, data) {
 
   // Draw the data
   ctx.stroke();
+}
+
+function requestError(err) {
+  console.log("XMLHttpRequest Error: " + err);
 }
 
 export { init };
