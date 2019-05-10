@@ -39,3 +39,4 @@ Thumbs.db
 # Other #
 ######################
 node_modules/
+examples/counties/data/
