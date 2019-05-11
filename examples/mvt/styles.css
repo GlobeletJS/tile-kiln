@@ -1,0 +1,21 @@
+* {
+  box-sizing: border-box;
+}
+html {
+  overflow: hidden;
+  height: 100%;
+}
+body {
+  height: 100%;
+  border: 0;
+  margin: 0;
+  touch-action: none;
+  overscroll-behavior: none;
+}
+#map {
+  width: 960px;
+  height: 640px;
+  background-color: #FF0000;
+  display: inline-block;
+  position: relative;
+}

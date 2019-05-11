@@ -12,4 +12,14 @@ export default [{
     format: 'iife',
     name: 'counties',
   },
+}, {
+  input: 'mvt/main.js',
+  plugins: [
+    resolve(),
+  ],
+  output: {
+    file: 'mvt/main.min.js',
+    format: 'iife',
+    name: 'mvt',
+  },
 }];
