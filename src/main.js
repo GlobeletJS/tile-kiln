@@ -2,7 +2,7 @@ import { initDisplay } from "./display.js";
 import * as d3 from 'd3-geo';
 //import * as topojson from 'topojson-client';
 import { Pbf as Protobuf } from 'pbf';
-import * as mvt from '@mapbox/vector-tile';
+import { VectorTile } from 'vector-tile-js';
 
 export function init(div, dataHref, dataType) {
   // Input div is the ID of an HTML div where the map will be rendered
@@ -44,7 +44,7 @@ export function init(div, dataHref, dataType) {
     }
     const buffer = new Uint8Array(this.response);
     const pbuffer = new Protobuf(buffer);
-    const layers = new mvt.VectorTile(pbuffer).layers;
+    const layers = new VectorTile(pbuffer).layers;
     for (let layer in layers) {
       var data = layerToGeoJSON( layers[layer] );
       console.log("layer converted to GeoJSON = " + JSON.stringify(data));
