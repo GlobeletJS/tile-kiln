@@ -1,7 +1,7 @@
 import { initDisplay } from "./display.js";
 import * as d3 from 'd3-geo';
 //import * as topojson from 'topojson-client';
-import { __moduleExports as Protobuf } from 'pbf'; // Yuck. From trial & error
+import { Pbf as Protobuf } from 'pbf';
 import * as mvt from '@mapbox/vector-tile';
 
 export function init(div, dataHref, dataType) {

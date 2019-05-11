@@ -642,15 +642,6 @@ var write = function (buffer, value, offset, isLE, mLen, nBytes) {
   buffer[offset + i - d] |= s * 128;
 };
 
-var ieee754 = {
-	read: read,
-	write: write
-};
-
-var pbf = Pbf;
-
-
-
 function Pbf(buf) {
     this.buf = ArrayBuffer.isView && ArrayBuffer.isView(buf) ? buf : new Uint8Array(buf || 0);
     this.pos = 0;
@@ -721,13 +712,13 @@ Pbf.prototype = {
     },
 
     readFloat: function() {
-        var val = ieee754.read(this.buf, this.pos, true, 23, 4);
+        var val = read(this.buf, this.pos, true, 23, 4);
         this.pos += 4;
         return val;
     },
 
     readDouble: function() {
-        var val = ieee754.read(this.buf, this.pos, true, 52, 8);
+        var val = read(this.buf, this.pos, true, 52, 8);
         this.pos += 8;
         return val;
     },
@@ -943,13 +934,13 @@ Pbf.prototype = {
 
     writeFloat: function(val) {
         this.realloc(4);
-        ieee754.write(this.buf, val, this.pos, true, 23, 4);
+        write(this.buf, val, this.pos, true, 23, 4);
         this.pos += 4;
     },
 
     writeDouble: function(val) {
         this.realloc(8);
-        ieee754.write(this.buf, val, this.pos, true, 52, 8);
+        write(this.buf, val, this.pos, true, 52, 8);
         this.pos += 8;
     },
 
@@ -1926,7 +1917,7 @@ function init(div, dataHref, dataType) {
       return;
     }
     const buffer = new Uint8Array(this.response);
-    const pbuffer = new pbf(buffer);
+    const pbuffer = new Pbf(buffer);
     const layers = new VectorTile$1(pbuffer).layers;
     for (let layer in layers) {
       var data = layerToGeoJSON( layers[layer] );
