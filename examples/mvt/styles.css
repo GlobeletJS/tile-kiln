@@ -13,8 +13,8 @@ body {
   overscroll-behavior: none;
 }
 #map {
-  width: 960px;
-  height: 640px;
+  width: 512px;
+  height: 512px;
   background-color: #FF0000;
   display: inline-block;
   position: relative;

@@ -58,7 +58,7 @@ export function init(div, dataHref, dataType) {
     const features = [];
     for (let i = 0; i < layer.length; ++i) {
       // We ignore the tile coordinates for now, and treat it as the 0,0,0 tile
-      const feature = layer.feature(i).toGeoJSON(29, 53, 7);
+      const feature = layer.feature(i).toGeoJSON(512);
       features.push(feature);
     }
     return {
@@ -74,6 +74,7 @@ export function init(div, dataHref, dataType) {
       return;
     }
     var data = JSON.parse(this.responseText);
+    console.log(data);
     draw(ctx, path, data);
   }
 }
@@ -82,10 +83,19 @@ function draw(ctx, path, data) {
   // Set up the drawing path and parameters
   ctx.beginPath();
   path(data);
-  ctx.strokeStyle = "#000000";
+  // Fill the areas
+  ctx.fillStyle = "#DDEEDD";
+  ctx.fill();
+  // Set some line parameters
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  // Draw the boundaries
+  //ctx.strokeStyle = "#000000";
+  //ctx.lineWidth = 3;
+  //ctx.stroke();
+  // Draw boundaries again, to put a white strip in the middle
+  ctx.strokeStyle = "#FFFFFF";
   ctx.lineWidth = 1;
-
-  // Draw the data
   ctx.stroke();
 }
 
