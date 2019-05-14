@@ -1877,6 +1877,55 @@ function readTile(tag, layers, pbf) {
   }
 }
 
+function readMVT(dataHref, callback) {
+  // Input dataHref is the path to a file containing a Mapbox Vector Tile
+
+  // Request the data
+  var request = new XMLHttpRequest();
+  request.onerror = requestError;
+  request.open('get', dataHref);
+  request.responseType = "arraybuffer"; // WARNING: not supported by iOS Safari?
+  request.onload = parseMVT;
+  request.send();
+
+  function parseMVT() {
+    if (this.responseType !== "arraybuffer") {
+      var err = "Wrong responseType. Expected arraybuffer, got " + 
+        this.responseType;
+      callback(err, null);
+      return;
+    }
+    const pbuffer = new Pbf( new Uint8Array(this.response) );
+    const tile = new VectorTile(pbuffer);
+    callback(null, tile);
+  }
+
+  function requestError(err) {
+    callback("XMLHttpRequest Error: " + err, null);
+  }
+}
+
+function readGeoJSON(dataHref, callback) {
+  // Input dataHref is the path to a file containing GeoJSON data
+
+  // Request the data
+  var request = new XMLHttpRequest();
+  request.onerror = requestError;
+  request.open('get', dataHref);
+  // Load the response as text, since Edge doesn't support json responseType
+  request.responseType = "text";
+  request.onload = parseJSON;
+  request.send();
+
+  function parseJSON() {
+    callback( null, JSON.parse(this.responseText) );
+  }
+
+  function requestError(err) {
+    callback("XMLHttpRequest Error: " + err, null);
+  }
+}
+
 function init(div, dataHref, dataType) {
   // Input div is the ID of an HTML div where the map will be rendered
   // Input dataHref is the path to a file containing map data
@@ -1892,35 +1941,25 @@ function init(div, dataHref, dataType) {
   var path = index(null, ctx);
 
   // Get the data
-  var request = new XMLHttpRequest();
-  request.onerror = requestError;
-  request.open('get', dataHref);
   if (dataType === "geojson") {
-    // Load the response as text, since Edge doesn't support json responseType
-    request.responseType = "text";
-    request.onload = drawJSON;
+    readGeoJSON(dataHref, drawJSON);
   } else if (dataType === "mvt") {
-    // WARNING: this responseType may not be supported by Safari on iOS?
-    request.responseType = "arraybuffer";
-    request.onload = drawMVT;
+    readMVT(dataHref, drawMVT);
   } else {
     console.log("dataType " + dataType + " not supported");
     return;
   }
-  request.send();
 
-  function drawMVT() {
-    if (this.responseType !== "arraybuffer") {
-      console.log("Wrong responseType. Expected arraybuffer, got " + 
-          this.responseType);
+  function drawMVT(err, tile) {
+    if (err) {
+      console.log(err);
       return;
     }
-    const buffer = new Uint8Array(this.response);
-    const pbuffer = new Pbf(buffer);
-    const layers = new VectorTile(pbuffer).layers;
+    const layers = tile.layers;
     for (let layer in layers) {
+      console.log("Decoding layer " + layers[layer].name);
       var data = layerToGeoJSON( layers[layer] );
-      console.log("layer converted to GeoJSON = " + JSON.stringify(data));
+      //console.log("layer converted to GeoJSON = " + JSON.stringify(data));
       draw(ctx, path, data);
     }
   }
@@ -1940,13 +1979,11 @@ function init(div, dataHref, dataType) {
     };
   }
 
-  function drawJSON() {
-    if (this.responseType !== "text") {
-      console.log("Wrong responseType. Expected text, got " + 
-          this.responseType);
+  function drawJSON(err, data) {
+    if (err) {
+      console.log(err);
       return;
     }
-    var data = JSON.parse(this.responseText);
     console.log(data);
     draw(ctx, path, data);
   }
@@ -1970,10 +2007,6 @@ function draw(ctx, path, data) {
   ctx.strokeStyle = "#FFFFFF";
   ctx.lineWidth = 1;
   ctx.stroke();
-}
-
-function requestError(err) {
-  console.log("XMLHttpRequest Error: " + err);
 }
 
 export { init };

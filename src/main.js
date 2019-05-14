@@ -1,8 +1,6 @@
 import { initDisplay } from "./display.js";
 import * as d3 from 'd3-geo';
-//import * as topojson from 'topojson-client';
-import { Pbf as Protobuf } from 'pbf';
-import { VectorTile } from 'vector-tile-js';
+import { readMVT, readGeoJSON } from "./readVector.js";
 
 export function init(div, dataHref, dataType) {
   // Input div is the ID of an HTML div where the map will be rendered
@@ -19,35 +17,25 @@ export function init(div, dataHref, dataType) {
   var path = d3.geoPath(null, ctx);
 
   // Get the data
-  var request = new XMLHttpRequest();
-  request.onerror = requestError;
-  request.open('get', dataHref);
   if (dataType === "geojson") {
-    // Load the response as text, since Edge doesn't support json responseType
-    request.responseType = "text";
-    request.onload = drawJSON;
+    readGeoJSON(dataHref, drawJSON);
   } else if (dataType === "mvt") {
-    // WARNING: this responseType may not be supported by Safari on iOS?
-    request.responseType = "arraybuffer";
-    request.onload = drawMVT;
+    readMVT(dataHref, drawMVT);
   } else {
     console.log("dataType " + dataType + " not supported");
     return;
   }
-  request.send();
 
-  function drawMVT() {
-    if (this.responseType !== "arraybuffer") {
-      console.log("Wrong responseType. Expected arraybuffer, got " + 
-          this.responseType);
+  function drawMVT(err, tile) {
+    if (err) {
+      console.log(err);
       return;
     }
-    const buffer = new Uint8Array(this.response);
-    const pbuffer = new Protobuf(buffer);
-    const layers = new VectorTile(pbuffer).layers;
+    const layers = tile.layers;
     for (let layer in layers) {
+      console.log("Decoding layer " + layers[layer].name);
       var data = layerToGeoJSON( layers[layer] );
-      console.log("layer converted to GeoJSON = " + JSON.stringify(data));
+      //console.log("layer converted to GeoJSON = " + JSON.stringify(data));
       draw(ctx, path, data);
     }
   }
@@ -67,13 +55,11 @@ export function init(div, dataHref, dataType) {
     };
   }
 
-  function drawJSON() {
-    if (this.responseType !== "text") {
-      console.log("Wrong responseType. Expected text, got " + 
-          this.responseType);
+  function drawJSON(err, data) {
+    if (err) {
+      console.log(err);
       return;
     }
-    var data = JSON.parse(this.responseText);
     console.log(data);
     draw(ctx, path, data);
   }
@@ -97,8 +83,4 @@ function draw(ctx, path, data) {
   ctx.strokeStyle = "#FFFFFF";
   ctx.lineWidth = 1;
   ctx.stroke();
-}
-
-function requestError(err) {
-  console.log("XMLHttpRequest Error: " + err);
 }
