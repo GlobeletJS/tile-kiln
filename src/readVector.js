@@ -29,7 +29,7 @@ export function readMVT(dataHref, callback) {
   }
 }
 
-export function readGeoJSON(dataHref, callback) {
+export function readJSON(dataHref, callback) {
   // Input dataHref is the path to a file containing GeoJSON data
 
   // Request the data
