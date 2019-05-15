@@ -579,14 +579,32 @@ function initRenderer(ctx) {
   function setStyles(styleDoc) {
     // Index each layer's style by the layer name for easier access
     for (let layer of styleDoc.layers) {
-      layerStyles[ layer["source-layer"] ] = layer;
-      //console.log("Styles for layer " + layer["source-layer"] + ":");
+      var name = layer["source-layer"];
+      if (!name && layer.type === "background") name = "background";
+      layerStyles[name] = layer;
+      //console.log("Styles for layer " + name + ":");
       //console.log(layer);
     }
     return;
   }
 
   function drawMVT(tile) {
+    var cWidth = ctx.canvas.width;
+    var cHeight = ctx.canvas.height;
+    // Clear the canvas
+    ctx.clearRect(0, 0, cWidth, cHeight);
+
+    // Fill the background color, if provided
+    var bgStyle = layerStyles["background"];
+    if (bgStyle && 
+        bgStyle.paint["background-color"] &&
+        bgStyle.layout["visibility"] === "visible") {
+      console.log("drawMVT: Filling background");
+      ctx.fillStyle = bgStyle.paint["background-color"];
+      ctx.fillRect(0, 0, cWidth, cHeight);
+    }
+
+    // Render each layer in the tile
     const layers = tile.layers;
     for (let layer in layers) {
       // Convert this layer to GeoJSON
@@ -603,7 +621,7 @@ function initRenderer(ctx) {
       }
 
       // Draw the layer, using the associated styles
-      draw(ctx, path, data, layerStyles[ layers[layer].name ]);
+      draw(ctx, path, data, style);
     }
     return;
   }
