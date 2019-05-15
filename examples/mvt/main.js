@@ -4,7 +4,7 @@ import * as vectormap from "../../dist/vectormap.bundle.js";
 
 export function main() {
   var tileHref = "testStreets.mvt";
-  var styleHref = "streetsStyle.json";
+  var styleHref = "streets-v8-style.json";
 
   var map = vectormap.init('map', tileHref, styleHref, 'mvt');
 }

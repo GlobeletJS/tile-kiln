@@ -569,7 +569,7 @@ function initRenderer(ctx) {
   // First param is the projection. Keep the data's native coordinates for now
   const path = index(null, ctx);
 
-  const layerStyles = {};
+  var styles;
 
   return {
     setStyles,
@@ -577,59 +577,95 @@ function initRenderer(ctx) {
   };
 
   function setStyles(styleDoc) {
-    // Index each layer's style by the layer name for easier access
-    for (let layer of styleDoc.layers) {
-      var name = layer["source-layer"];
-      if (!name && layer.type === "background") name = "background";
-      layerStyles[name] = layer;
-      //console.log("Styles for layer " + name + ":");
-      //console.log(layer);
-    }
+    styles = styleDoc;
     return;
   }
 
   function drawMVT(tile) {
-    var cWidth = ctx.canvas.width;
-    var cHeight = ctx.canvas.height;
-    // Clear the canvas
-    ctx.clearRect(0, 0, cWidth, cHeight);
+    // Clear the canvas, and restore default styles
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.restore();
 
-    // Fill the background color, if provided
-    var bgStyle = layerStyles["background"];
-    if (bgStyle && 
-        bgStyle.paint["background-color"] &&
-        bgStyle.layout["visibility"] === "visible") {
-      console.log("drawMVT: Filling background");
-      ctx.fillStyle = bgStyle.paint["background-color"];
-      ctx.fillRect(0, 0, cWidth, cHeight);
-    }
+    for (let styleLayer of styles.layers) {
+      console.log("drawMVT: processing styleLayer id = " + styleLayer.id);
+      var layout = styleLayer.layout;
+      if (layout && layout["visibility"] === "none") continue;
+      var mapLayer = findMapLayer(styleLayer["source-layer"], tile.layers);
+      var mapData = layerToGeoJSON(mapLayer, styleLayer.filter);
 
-    // Render each layer in the tile
-    const layers = tile.layers;
-    for (let layer in layers) {
-      // Convert this layer to GeoJSON
-      console.log("Decoding layer " + layers[layer].name);
-      var data = layerToGeoJSON( layers[layer] );
-      //console.log("layer converted to GeoJSON = " + JSON.stringify(data));
-
-      // Get the style for this layer
-      var style = layerStyles[ layers[layer].name ];
-      if (!style) {
-        console.log("ERROR in drawMVT: No style found for layer " + 
-            layers[layer].name);
-        return;
+      switch (styleLayer.type) {
+        case "background" :
+          renderBackground(styleLayer);
+          break;
+        case "circle" :  // Point or MultiPoint geometry
+          renderCircle(styleLayer, mapData);
+          break;
+        case "line" :    // LineString, MultiLineString, Polygon, or MultiPolygon
+          renderLine(styleLayer, mapData);
+          break;
+        case "fill" :    // Polygon or MultiPolygon (maybe also linestrings?)
+          renderFill(styleLayer, mapData);
+          break;
+        case "symbol" :  // Labels
+        default :
+          console.log("ERROR in drawMVT: layer.type = " + styleLayer.type +
+              " not supported!");
       }
-
-      // Draw the layer, using the associated styles
-      draw(ctx, path, data, style);
     }
     return;
   }
+
+  function renderBackground(style) {
+    if (!style.paint["background-color"]) return;
+    ctx.fillStyle = style.paint["background-color"];
+    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  }
+
+  function renderCircle(style, data) {
+    if (!data) return;
+    ctx.beginPath();
+    var paint = style.paint;
+    if (paint["circle-radius"]) path.pointRadius(paint["circle-radius"]);
+    if (paint["circle-color"]) ctx.fillStyle = paint["circle-color"];
+    path(data);
+    ctx.fill();
+  }
+
+  function renderLine(style, data) {
+    if (!data) return;
+    ctx.beginPath();
+    var layout = style.layout;
+    if (layout["line-cap"]) ctx.lineCap = layout["line-cap"];
+    if (layout["line-join"]) ctx.lineJoin = layout["line-join"];
+    if (layout["line-miter-limit"]) ctx.miterLimit = layout["line-miter-limit"];
+    var paint = style.paint;
+    if (paint["line-color"]) ctx.strokeStyle = paint["line-color"];
+    if (paint["line-width"]) ctx.lineWidth = paint["line-width"];
+    path(data);
+    ctx.stroke();
+  }
+
+  function renderFill(style, data) {
+    if (!data) return;
+    ctx.beginPath();
+    if (style.paint["fill-color"]) ctx.fillStyle = style.paint["fill-color"];
+    path(data);
+    ctx.fill();
+  }
 }
 
-function layerToGeoJSON( layer ) {
+function findMapLayer(name, layers) {
+  if (!name) return false;
+  for (let layer in layers) {
+    if (layers[layer].name === name) return layers[layer];
+  }
+  return false; // No matching layer
+}
+
+function layerToGeoJSON(layer, filter) {
   // Based on https://observablehq.com/@mbostock/d3-mapbox-vector-tiles
   if (!layer) return;
+  console.log("layerToGeoJSON: filter = " + filter);
   const features = [];
   for (let i = 0; i < layer.length; ++i) {
     const feature = layer.feature(i).toGeoJSON(512);
@@ -639,45 +675,6 @@ function layerToGeoJSON( layer ) {
     type: "FeatureCollection", 
     features: features,
   };
-}
-
-function draw(ctx, path, data, style) {
-  console.log("In draw function. style:");
-  console.log(style);
-
-  // Reset context to default styles
-  ctx.restore();
-  // Set up the drawing path
-  ctx.beginPath();
-
-  // Apply styling
-  let layout = style.layout;
-  let paint  = style.paint;
-  switch (style.type) {
-    case "circle" :  // Point or MultiPoint geometry
-      if (paint["circle-radius"]) path.pointRadius(paint["circle-radius"]);
-      if (paint["circle-color"]) ctx.fillStyle = paint["circle-color"];
-      path(data);
-      ctx.fill();
-      break;
-    case "line" :    // LineString, MultiLineString, Polygon, or MultiPolygon
-      if (layout["line-cap"]) ctx.lineCap = layout["line-cap"];
-      if (layout["line-join"]) ctx.lineJoin = layout["line-join"];
-      if (layout["line-miter-limit"]) ctx.miterLimit = layout["line-miter-limit"];
-      if (paint["line-color"]) ctx.strokeStyle = paint["line-color"];
-      if (paint["line-width"]) ctx.lineWidth = paint["line-width"];
-      path(data);
-      ctx.stroke();
-      break;
-    case "fill" :    // Polygon or MultiPolygon (maybe also linestrings?)
-      if (paint["fill-color"]) ctx.fillStyle = paint["fill-color"];
-      path(data);
-      ctx.fill();
-      break;
-    default:
-      console.log("ERROR: Unknown layer rendering type: " + style.type);
-  }
-  return;
 }
 
 var read = function (buffer, offset, isLE, mLen, nBytes) {
