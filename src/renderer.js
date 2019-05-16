@@ -1,4 +1,5 @@
 import * as d3 from 'd3-geo';
+import { layerToGeoJSON } from "./getFeatures.js";
 
 export function initRenderer(ctx) {
   // Input ctx is a Canvas 2D rendering context
@@ -103,19 +104,4 @@ function findMapLayer(name, layers) {
     if (layers[layer].name === name) return layers[layer];
   }
   return false; // No matching layer
-}
-
-function layerToGeoJSON(layer, filter) {
-  // Based on https://observablehq.com/@mbostock/d3-mapbox-vector-tiles
-  if (!layer) return;
-  console.log("layerToGeoJSON: filter = " + filter);
-  const features = [];
-  for (let i = 0; i < layer.length; ++i) {
-    const feature = layer.feature(i).toGeoJSON(512);
-    features.push(feature);
-  }
-  return {
-    type: "FeatureCollection", 
-    features: features,
-  };
 }
