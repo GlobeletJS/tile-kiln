@@ -557,22 +557,30 @@ function index(projection, context) {
   return path.projection(projection).context(context);
 }
 
-function layerToGeoJSON(layer, filterObj) {
-  // Based on https://observablehq.com/@mbostock/d3-mapbox-vector-tiles
-  if (!layer) return;
-  //console.log("layerToGeoJSON: filterObj = " + filterObj);
+function initFeatureGetter(size, sx, sy) {
+  // This closure just saves the size, sx, sy parameters
 
-  var filter = prepFilter(filterObj);
+  function getFeatures(layer, filterObj) {
+    // Based on https://observablehq.com/@mbostock/d3-mapbox-vector-tiles
+    if (!layer) return;
+    //console.log("layerToGeoJSON: filterObj = " + filterObj);
 
-  const features = [];
-  for (let i = 0; i < layer.length; ++i) {
-    const feature = layer.feature(i).toGeoJSON(512);
-    if (filter(feature)) features.push(feature);
+    var filter = prepFilter(filterObj);
+
+    const features = [];
+    for (let i = 0; i < layer.length; ++i) {
+      const feature = layer.feature(i).toGeoJSON(size, sx, sy);
+      if (filter(feature)) features.push(feature);
+    }
+
+    if (features.length < 1) return false;
+    return {
+      type: "FeatureCollection", 
+      features: features,
+    };
   }
-  return {
-    type: "FeatureCollection", 
-    features: features,
-  };
+
+  return getFeatures;
 }
 
 function prepFilter(filterObj) {
@@ -639,7 +647,8 @@ function prepFilter(filterObj) {
 function initFeatureValGetter(key) {
   switch (key) {
     case "$type":
-      return f => f.type;
+      // TODO: data includes MultiLineString, MultiPolygon, etc-NOT IN SPEC
+      return f => f.geometry.type;
     case "$id":
       return f => f.id;
     default:
@@ -671,34 +680,44 @@ function initRenderer(ctx) {
     return;
   }
 
-  function drawMVT(tile) {
+  function drawMVT(tile, zoom, size, sx, sy) {
     // Clear the canvas, and restore default styles
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     ctx.restore();
 
-    for (let styleLayer of styles.layers) {
-      console.log("drawMVT: processing styleLayer id = " + styleLayer.id);
-      var layout = styleLayer.layout;
-      if (layout && layout["visibility"] === "none") continue;
-      var mapLayer = findMapLayer(styleLayer["source-layer"], tile.layers);
-      var mapData = layerToGeoJSON(mapLayer, styleLayer.filter);
+    var getFeatures = initFeatureGetter(size, sx, sy);
 
-      switch (styleLayer.type) {
-        case "background" :
-          renderBackground(styleLayer);
-          break;
+    for (let style of styles.layers) {
+      // Quick exits if this layer is not meant to be displayed
+      if (style.layout && style.layout["visibility"] === "none") continue;
+      if (style.minzoom !== undefined && zoom < style.minzoom) continue;
+      if (style.maxzoom !== undefined && zoom > style.maxzoom) continue;
+
+      if (style.type === "background") {
+        renderBackground(style);
+        continue;
+      }
+
+      var mapLayer = findMapLayer(style["source-layer"], tile.layers);
+      var mapData = getFeatures(mapLayer, style.filter);
+      if (!mapData) continue;
+      //console.log("mapData = " + JSON.stringify(mapData) );
+
+      console.log("drawMVT: processing style id = " + style.id);
+
+      switch (style.type) {
         case "circle" :  // Point or MultiPoint geometry
-          renderCircle(styleLayer, mapData);
+          renderCircle(style, mapData);
           break;
         case "line" :    // LineString, MultiLineString, Polygon, or MultiPolygon
-          renderLine(styleLayer, mapData);
+          renderLine(style, mapData);
           break;
         case "fill" :    // Polygon or MultiPolygon (maybe also linestrings?)
-          renderFill(styleLayer, mapData);
+          renderFill(style, mapData);
           break;
         case "symbol" :  // Labels
         default :
-          console.log("ERROR in drawMVT: layer.type = " + styleLayer.type +
+          console.log("ERROR in drawMVT: layer.type = " + style.type +
               " not supported!");
       }
     }
@@ -712,7 +731,6 @@ function initRenderer(ctx) {
   }
 
   function renderCircle(style, data) {
-    if (!data) return;
     ctx.beginPath();
     var paint = style.paint;
     if (paint["circle-radius"]) path.pointRadius(paint["circle-radius"]);
@@ -722,7 +740,6 @@ function initRenderer(ctx) {
   }
 
   function renderLine(style, data) {
-    if (!data) return;
     ctx.beginPath();
     var layout = style.layout;
     if (layout["line-cap"]) ctx.lineCap = layout["line-cap"];
@@ -736,7 +753,6 @@ function initRenderer(ctx) {
   }
 
   function renderFill(style, data) {
-    if (!data) return;
     ctx.beginPath();
     if (style.paint["fill-color"]) ctx.fillStyle = style.paint["fill-color"];
     path(data);
@@ -2149,7 +2165,12 @@ function init(div, tileHref, styleHref) {
       console.log(err);
       return;
     }
-    renderer.drawMVT(tile);
+    // TODO: get these from calling prog.
+    var zoom = 7;
+    var size = 512;
+    var sx = 0;
+    var sy = 0;
+    renderer.drawMVT(tile, zoom, size, sx, sy);
   }
 }
 

@@ -1,5 +1,5 @@
 import * as d3 from 'd3-geo';
-import { layerToGeoJSON } from "./getFeatures.js";
+import { initFeatureGetter } from "./getFeatures.js";
 
 export function initRenderer(ctx) {
   // Input ctx is a Canvas 2D rendering context
@@ -25,34 +25,44 @@ export function initRenderer(ctx) {
     return;
   }
 
-  function drawMVT(tile) {
+  function drawMVT(tile, zoom, size, sx, sy) {
     // Clear the canvas, and restore default styles
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     ctx.restore();
 
-    for (let styleLayer of styles.layers) {
-      console.log("drawMVT: processing styleLayer id = " + styleLayer.id);
-      var layout = styleLayer.layout;
-      if (layout && layout["visibility"] === "none") continue;
-      var mapLayer = findMapLayer(styleLayer["source-layer"], tile.layers);
-      var mapData = layerToGeoJSON(mapLayer, styleLayer.filter);
+    var getFeatures = initFeatureGetter(size, sx, sy);
 
-      switch (styleLayer.type) {
-        case "background" :
-          renderBackground(styleLayer);
-          break;
+    for (let style of styles.layers) {
+      // Quick exits if this layer is not meant to be displayed
+      if (style.layout && style.layout["visibility"] === "none") continue;
+      if (style.minzoom !== undefined && zoom < style.minzoom) continue;
+      if (style.maxzoom !== undefined && zoom > style.maxzoom) continue;
+
+      if (style.type === "background") {
+        renderBackground(style);
+        continue;
+      }
+
+      var mapLayer = findMapLayer(style["source-layer"], tile.layers);
+      var mapData = getFeatures(mapLayer, style.filter);
+      if (!mapData) continue;
+      //console.log("mapData = " + JSON.stringify(mapData) );
+
+      console.log("drawMVT: processing style id = " + style.id);
+
+      switch (style.type) {
         case "circle" :  // Point or MultiPoint geometry
-          renderCircle(styleLayer, mapData);
+          renderCircle(style, mapData);
           break;
         case "line" :    // LineString, MultiLineString, Polygon, or MultiPolygon
-          renderLine(styleLayer, mapData);
+          renderLine(style, mapData);
           break;
         case "fill" :    // Polygon or MultiPolygon (maybe also linestrings?)
-          renderFill(styleLayer, mapData);
+          renderFill(style, mapData);
           break;
         case "symbol" :  // Labels
         default :
-          console.log("ERROR in drawMVT: layer.type = " + styleLayer.type +
+          console.log("ERROR in drawMVT: layer.type = " + style.type +
               " not supported!");
       }
     }
@@ -66,7 +76,6 @@ export function initRenderer(ctx) {
   }
 
   function renderCircle(style, data) {
-    if (!data) return;
     ctx.beginPath();
     var paint = style.paint;
     if (paint["circle-radius"]) path.pointRadius(paint["circle-radius"]);
@@ -76,7 +85,6 @@ export function initRenderer(ctx) {
   }
 
   function renderLine(style, data) {
-    if (!data) return;
     ctx.beginPath();
     var layout = style.layout;
     if (layout["line-cap"]) ctx.lineCap = layout["line-cap"];
@@ -90,7 +98,6 @@ export function initRenderer(ctx) {
   }
 
   function renderFill(style, data) {
-    if (!data) return;
     ctx.beginPath();
     if (style.paint["fill-color"]) ctx.fillStyle = style.paint["fill-color"];
     path(data);

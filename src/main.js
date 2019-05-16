@@ -33,6 +33,11 @@ export function init(div, tileHref, styleHref) {
       console.log(err);
       return;
     }
-    renderer.drawMVT(tile);
+    // TODO: get these from calling prog.
+    var zoom = 7;
+    var size = 512;
+    var sx = 0;
+    var sy = 0;
+    renderer.drawMVT(tile, zoom, size, sx, sy);
   }
 }

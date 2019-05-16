@@ -1,19 +1,27 @@
-export function layerToGeoJSON(layer, filterObj) {
-  // Based on https://observablehq.com/@mbostock/d3-mapbox-vector-tiles
-  if (!layer) return;
-  //console.log("layerToGeoJSON: filterObj = " + filterObj);
+export function initFeatureGetter(size, sx, sy) {
+  // This closure just saves the size, sx, sy parameters
 
-  var filter = prepFilter(filterObj);
+  function getFeatures(layer, filterObj) {
+    // Based on https://observablehq.com/@mbostock/d3-mapbox-vector-tiles
+    if (!layer) return;
+    //console.log("layerToGeoJSON: filterObj = " + filterObj);
 
-  const features = [];
-  for (let i = 0; i < layer.length; ++i) {
-    const feature = layer.feature(i).toGeoJSON(512);
-    if (filter(feature)) features.push(feature);
+    var filter = prepFilter(filterObj);
+
+    const features = [];
+    for (let i = 0; i < layer.length; ++i) {
+      const feature = layer.feature(i).toGeoJSON(size, sx, sy);
+      if (filter(feature)) features.push(feature);
+    }
+
+    if (features.length < 1) return false;
+    return {
+      type: "FeatureCollection", 
+      features: features,
+    };
   }
-  return {
-    type: "FeatureCollection", 
-    features: features,
-  };
+
+  return getFeatures;
 }
 
 function prepFilter(filterObj) {
@@ -80,7 +88,8 @@ function prepFilter(filterObj) {
 function initFeatureValGetter(key) {
   switch (key) {
     case "$type":
-      return f => f.type;
+      // TODO: data includes MultiLineString, MultiPolygon, etc-NOT IN SPEC
+      return f => f.geometry.type;
     case "$id":
       return f => f.id;
     default:
