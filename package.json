@@ -39,6 +39,7 @@
     "rollup-plugin-node-resolve": "^4.2.3"
   },
   "dependencies": {
+    "csscolorparser": "^1.0.3",
     "d3-geo": "^1.11.3",
     "pbf": "github:jjhembd/pbf",
     "topojson-client": "^3.0.0",

@@ -4,8 +4,6 @@ export function initFeatureGetter(size, sx, sy) {
   function getFeatures(layer, filterObj) {
     // Based on https://observablehq.com/@mbostock/d3-mapbox-vector-tiles
     if (!layer) return;
-    //console.log("layerToGeoJSON: filterObj = " + filterObj);
-
     var filter = prepFilter(filterObj);
 
     const features = [];
@@ -14,11 +12,9 @@ export function initFeatureGetter(size, sx, sy) {
       if (filter(feature)) features.push(feature);
     }
 
-    if (features.length < 1) return false;
-    return {
-      type: "FeatureCollection", 
-      features: features,
-    };
+    return (features.length < 1)
+      ? false
+      : { type: "FeatureCollection", features: features };
   }
 
   return getFeatures;

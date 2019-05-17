@@ -1,5 +1,7 @@
+import { derefLayers } from "./deref.js";
 import * as d3 from 'd3-geo';
 import { initFeatureGetter } from "./getFeatures.js";
+import { evalStyle } from "./styleFunction.js";
 
 export function initRenderer(ctx) {
   // Input ctx is a Canvas 2D rendering context
@@ -13,7 +15,7 @@ export function initRenderer(ctx) {
   // First param is the projection. Keep the data's native coordinates for now
   const path = d3.geoPath(null, ctx);
 
-  var styles;
+  var styles, zoom;
 
   return {
     setStyles,
@@ -22,15 +24,15 @@ export function initRenderer(ctx) {
 
   function setStyles(styleDoc) {
     styles = styleDoc;
+    styles.layers = derefLayers(styles.layers);
     return;
   }
 
-  function drawMVT(tile, zoom, size, sx, sy) {
-    // Clear the canvas, and restore default styles
+  function drawMVT(tile, tileZoom, size, sx, sy) {
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    ctx.restore();
 
     var getFeatures = initFeatureGetter(size, sx, sy);
+    zoom = tileZoom;
 
     for (let style of styles.layers) {
       // Quick exits if this layer is not meant to be displayed
@@ -38,7 +40,10 @@ export function initRenderer(ctx) {
       if (style.minzoom !== undefined && zoom < style.minzoom) continue;
       if (style.maxzoom !== undefined && zoom > style.maxzoom) continue;
 
-      if (style.type === "background") {
+      // Start from default styles
+      ctx.restore();
+
+      if (style.type === "background") { // Special handling: no data
         renderBackground(style);
         continue;
       }
@@ -46,7 +51,6 @@ export function initRenderer(ctx) {
       var mapLayer = findMapLayer(style["source-layer"], tile.layers);
       var mapData = getFeatures(mapLayer, style.filter);
       if (!mapData) continue;
-      //console.log("mapData = " + JSON.stringify(mapData) );
 
       console.log("drawMVT: processing style id = " + style.id);
 
@@ -70,8 +74,8 @@ export function initRenderer(ctx) {
   }
 
   function renderBackground(style) {
-    if (!style.paint["background-color"]) return;
-    ctx.fillStyle = style.paint["background-color"];
+    setStyle("fillStyle", style.paint["background-color"]);
+    setStyle("globalAlpha", style.paint["background-opacity"]);
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   }
 
@@ -79,29 +83,48 @@ export function initRenderer(ctx) {
     ctx.beginPath();
     var paint = style.paint;
     if (paint["circle-radius"]) path.pointRadius(paint["circle-radius"]);
-    if (paint["circle-color"]) ctx.fillStyle = paint["circle-color"];
+    setStyle("fillStyle", paint["circle-color"]);
+    setStyle("globalAlpha", paint["circle-opacity"]);
+    // Missing circle-blur, circle-translate, circle-translate-anchor,
+    //  and circle-stroke stuff
     path(data);
     ctx.fill();
   }
 
   function renderLine(style, data) {
     ctx.beginPath();
-    var layout = style.layout;
-    if (layout["line-cap"]) ctx.lineCap = layout["line-cap"];
-    if (layout["line-join"]) ctx.lineJoin = layout["line-join"];
-    if (layout["line-miter-limit"]) ctx.miterLimit = layout["line-miter-limit"];
-    var paint = style.paint;
-    if (paint["line-color"]) ctx.strokeStyle = paint["line-color"];
-    if (paint["line-width"]) ctx.lineWidth = paint["line-width"];
+    setStyle("lineCap", style.layout["line-cap"]);
+    setStyle("lineJoin", style.layout["line-join"]);
+    setStyle("miterLimit", style.layout["line-miter-limit"]);
+    // Missing line-round-limit
+    setStyle("strokeStyle", style.paint["line-color"]);
+    setStyle("lineWidth", style.paint["line-width"]);
+    setStyle("globalAlpha", style.paint["line-opacity"]);
+    // Missing line-gap-width, line-translate, line-translate-anchor,
+    //  line-offset, line-blur, line-gradient, line-pattern, line-dasharray
     path(data);
     ctx.stroke();
   }
 
   function renderFill(style, data) {
     ctx.beginPath();
-    if (style.paint["fill-color"]) ctx.fillStyle = style.paint["fill-color"];
+    setStyle("fillStyle", style.paint["fill-color"]);
+    setStyle("globalAlpha", style.paint["fill-opacity"]);
+    // Missing fill-outline-color, fill-translate, fill-translate-anchor,
+    //  fill-pattern
     path(data);
     ctx.fill();
+  }
+
+  function setStyle(option, val) { // Nested for access to ctx, zoom
+    // If val was not set, return without updating state
+    // TODO: is this necessary? Canvas 2D already doesn't apply invalid values
+    if (val === undefined) return;
+
+    ctx[option] = (typeof val === "object")
+      ? evalStyle(val, zoom)
+      : val;
+    return;
   }
 }
 
