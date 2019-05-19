@@ -5,14 +5,9 @@ export function readMVT(dataHref, callback) {
   // Input dataHref is the path to a file containing a Mapbox Vector Tile
 
   // Request the data
-  var request = new XMLHttpRequest();
-  request.onerror = requestError;
-  request.open('get', dataHref);
-  request.responseType = "arraybuffer"; // WARNING: not supported by iOS Safari?
-  request.onload = parseMVT;
-  request.send();
+  xhrGet(dataHref, "arraybuffer", parseMVT);
 
-  function parseMVT() {
+  function parseMVT(err) {
     if (this.responseType !== "arraybuffer") {
       var err = "Wrong responseType. Expected arraybuffer, got " + 
         this.responseType;
@@ -23,29 +18,30 @@ export function readMVT(dataHref, callback) {
     const tile = new VectorTile(pbuffer);
     callback(null, tile);
   }
-
-  function requestError(err) {
-    callback("XMLHttpRequest Error: " + err, null);
-  }
 }
 
 export function readJSON(dataHref, callback) {
-  // Input dataHref is the path to a file containing GeoJSON data
+  // Input dataHref is the path to a file containing JSON
 
-  // Request the data
-  var request = new XMLHttpRequest();
-  request.onerror = requestError;
-  request.open('get', dataHref);
-  // Load the response as text, since Edge doesn't support json responseType
-  request.responseType = "text";
-  request.onload = parseJSON;
-  request.send();
+  // Request the data - as text, since Edge doesn't support json responseType
+  xhrGet(dataHref, "text", parseJSON);
 
-  function parseJSON() {
+  function parseJSON(err) {
     callback( null, JSON.parse(this.responseText) );
   }
+}
 
-  function requestError(err) {
-    callback("XMLHttpRequest Error: " + err, null);
+function xhrGet(href, type, callback) {
+  var req = new XMLHttpRequest();
+  req.onerror = reqError;
+  req.open('get', href);
+  req.responseType = type;
+  req.onload = callback;
+  req.send();
+
+  function reqError(err) {
+    // Not sure how to pass this to the callback? Need 2 callbacks?
+    console.log("XMLHttpRequest Error: " + err);
   }
+  return req;
 }
