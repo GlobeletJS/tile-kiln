@@ -5,7 +5,11 @@ import { readMVT, readJSON } from "./readVector.js";
 import * as vectormap from "../../dist/vectormap.bundle.js";
 
 //var tileHref = "data/terrain-v2_streets-v7_7-29-53.mvt";
-const tileHref = "https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/7/29/53.mvt?access_token=pk.eyJ1IjoiamhlbWJkIiwiYSI6ImNqcHpueHpyZjBlMjAzeG9kNG9oNzI2NTYifQ.K7fqhk2Z2YZ8NIV94M-5nA";
+//const tileHref = "https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/7/29/53.mvt?access_token=pk.eyJ1IjoiamhlbWJkIiwiYSI6ImNqcHpueHpyZjBlMjAzeG9kNG9oNzI2NTYifQ.K7fqhk2Z2YZ8NIV94M-5nA";
+const baseURL = "https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/";
+const tileName = "5/7/13.mvt";
+const token = "pk.eyJ1IjoiamhlbWJkIiwiYSI6ImNqcHpueHpyZjBlMjAzeG9kNG9oNzI2NTYifQ.K7fqhk2Z2YZ8NIV94M-5nA";
+const tileHref = baseURL + tileName + "?access_token=" + token;
 //var styleHref = "data/streets-v8-style.json";
 const styleHref = "https://api.mapbox.com/styles/v1/mapbox/streets-v8?access_token=pk.eyJ1IjoiamhlbWJkIiwiYSI6ImNqcHpueHpyZjBlMjAzeG9kNG9oNzI2NTYifQ.K7fqhk2Z2YZ8NIV94M-5nA";
 
@@ -31,7 +35,7 @@ export function main() {
     if (err) return console.log(err);
 
     // Draw this tile to the renderer canvas
-    var zoom = 7;
+    var zoom = 5;
     var size = 512;
     var sx = 0;
     var sy = 0;

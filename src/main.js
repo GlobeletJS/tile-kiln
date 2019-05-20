@@ -42,8 +42,11 @@ export function init(canvSize) {
     if (style.minzoom !== undefined && zoom < style.minzoom) return;
     if (style.maxzoom !== undefined && zoom > style.maxzoom) return;
 
-    // Start from default styles
+    // Start from default styles: restore what we saved
     ctx.restore();
+    // restore POPS the saved state off a stack. So if we want to restore again
+    // later, we need to re-save what we just restored
+    ctx.save();
 
     // If this is the background layer, we don't need any data
     if (style.type === "background") return renderer.fillBackground(style, zoom);
