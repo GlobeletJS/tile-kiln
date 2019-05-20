@@ -16,7 +16,7 @@ export function initRenderer(ctx) {
   function drawData(style, zoom, mapData) {
     // Input style is ONE layer from a Mapbox style document
     // Input mapData is a GeoJSON "FeatureCollection" 
-    console.log("drawData: processing style id = " + style.id);
+    //console.log("drawData: processing style id = " + style.id);
 
     switch (style.type) {
       case "circle" :  // Point or MultiPoint geometry
@@ -30,8 +30,8 @@ export function initRenderer(ctx) {
         break;
       case "symbol" :  // Labels
       default :
-        console.log("ERROR in drawMVT: layer.type = " + style.type +
-            " not supported!");
+        //console.log("ERROR in drawMVT: layer.type = " + style.type +
+        //    " not supported!");
     }
     return;
   }
