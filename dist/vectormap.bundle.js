@@ -920,16 +920,17 @@ function evalStyle(styleFunction, zoom) {
 
   var valType = typeof lowVal;
 
+  // Simple interpolation for numerical values
   if (valType === "number") return lowVal + t * (stops[iz][1] - lowVal);
 
+  // Check for valid CSS colors
   var color1 = (valType === "string")
     ? csscolorparser_1(lowVal)
     : null;
-  if (!color1) {
-    console.log("evalStyle: styleFunction = " + JSON.stringify(styleFunction));
-    console.log("ERROR in evalStyle: failed to understand stop values!");
-    return;
-  }
+
+  if (!color1) return lowVal; // Assume step function
+
+  // Interpolate colors
   var color2 = csscolorparser_1(stops[iz][1]);
   return interpColor(color1, color2, t);
 }
