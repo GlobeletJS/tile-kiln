@@ -14,7 +14,7 @@ export function main() {
   const dctx = initDisplay('map');
 
   // Initialize vector renderer
-  const renderer = vectormap.init(dctx.canvas.width, dctx.canvas.height);
+  const renderer = vectormap.init(512);
 
   // Get the style info
   readJSON(styleHref, setup);

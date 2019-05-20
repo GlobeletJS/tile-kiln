@@ -1054,11 +1054,11 @@ function initRenderer(ctx) {
   }
 }
 
-function init(width, height) {
+function init(canvSize) {
   // Create canvas for rendering, set drawingbuffer size
   const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = canvSize;
+  canvas.height = canvSize;
   // Initialize rendering context and save default styles
   const ctx = canvas.getContext("2d");
   ctx.save();
@@ -1081,7 +1081,7 @@ function init(width, height) {
 
   function drawMVT(tile, zoom, size, sx, sy) {
     // Input tile is a Mapbox Vector Tile, already parsed by 'vector-tile-js'
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, canvSize, canvSize);
 
     var getFeatures = initFeatureGetter(size, sx, sy);
     styles.layers.forEach( style => drawLayer(style, zoom, tile, getFeatures) );
