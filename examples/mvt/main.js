@@ -10,10 +10,11 @@ const tileHref = "https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapb
 const styleHref = "https://api.mapbox.com/styles/v1/mapbox/streets-v8?access_token=pk.eyJ1IjoiamhlbWJkIiwiYSI6ImNqcHpueHpyZjBlMjAzeG9kNG9oNzI2NTYifQ.K7fqhk2Z2YZ8NIV94M-5nA";
 
 export function main() {
-  const ctx = initDisplay('map');
+  // Initialize the display canvas and rendering context
+  const dctx = initDisplay('map');
 
   // Initialize vector renderer
-  const renderer = vectormap.init(ctx);
+  const renderer = vectormap.init(dctx.canvas.width, dctx.canvas.height);
 
   // Get the style info
   readJSON(styleHref, setup);
@@ -29,10 +30,14 @@ export function main() {
   function drawTile(err, tile) {
     if (err) return console.log(err);
 
+    // Draw this tile to the renderer canvas
     var zoom = 7;
     var size = 512;
     var sx = 0;
     var sy = 0;
     renderer.drawMVT(tile, zoom, size, sx, sy);
+
+    // Copy the renderer canvas onto our display canvas
+    dctx.drawImage(renderer.canvas, 0, 0);
   }
 }

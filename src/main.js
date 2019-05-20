@@ -2,9 +2,13 @@ import { derefLayers } from "./deref.js";
 import { initFeatureGetter } from "./getFeatures.js";
 import { initRenderer } from "./renderer.js";
 
-export function init(ctx) {
-  // Input ctx is a Canvas 2D rendering context
-  // Save the default styling
+export function init(width, height) {
+  // Create canvas for rendering, set drawingbuffer size
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  // Initialize rendering context and save default styles
+  const ctx = canvas.getContext("2d");
   ctx.save();
 
   const styles = {};
@@ -13,6 +17,7 @@ export function init(ctx) {
   return {
     setStyles,
     drawMVT,
+    canvas,
   };
 
   function setStyles(styleDoc) {
@@ -24,7 +29,7 @@ export function init(ctx) {
 
   function drawMVT(tile, zoom, size, sx, sy) {
     // Input tile is a Mapbox Vector Tile, already parsed by 'vector-tile-js'
-    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     var getFeatures = initFeatureGetter(size, sx, sy);
     styles.layers.forEach( style => drawLayer(style, zoom, tile, getFeatures) );

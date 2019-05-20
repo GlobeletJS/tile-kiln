@@ -33,16 +33,15 @@
   "homepage": "https://github.com/jjhembd/vectormap#readme",
   "devDependencies": {
     "http-server": "^0.11.1",
+    "pbf": "github:jjhembd/pbf",
     "rollup": "^1.11.3",
     "rollup-plugin-commonjs": "^9.3.4",
     "rollup-plugin-json": "^4.0.0",
-    "rollup-plugin-node-resolve": "^4.2.3"
+    "rollup-plugin-node-resolve": "^4.2.3",
+    "vector-tile-js": "github:jjhembd/vector-tile-js"
   },
   "dependencies": {
     "csscolorparser": "^1.0.3",
-    "d3-geo": "^1.11.3",
-    "pbf": "github:jjhembd/pbf",
-    "topojson-client": "^3.0.0",
-    "vector-tile-js": "github:jjhembd/vector-tile-js"
+    "d3-geo": "^1.11.3"
   }
 }
