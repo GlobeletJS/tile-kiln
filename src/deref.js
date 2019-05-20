@@ -26,9 +26,7 @@ export function derefLayers(layers) {
   layers = layers.slice(); // ??? What are we trying to achieve here?
 
   const map = Object.create(null); // stackoverflow.com/a/21079232/10082269
-  for (let i = 0; i < layers.length; i++) {
-    map[layers[i].id] = layers[i];
-  }
+  layers.forEach( layer => { map[layer.id] = layer; } );
 
   for (let i = 0; i < layers.length; i++) {
     if ('ref' in layers[i]) {

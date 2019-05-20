@@ -1,6 +1,9 @@
 import { parseCSSColor } from 'csscolorparser';
 
 export function evalStyle(styleFunction, zoom) {
+  // Quick exit if styleFunction is a constant or undefined
+  if (typeof styleFunction !== "object") return styleFunction;
+
   const stops = styleFunction.stops;
   if (!stops || stops.length < 2 || stops[0].length !== 2) {
     console.log("evalStyle: styleFunction = " + JSON.stringify(styleFunction));
