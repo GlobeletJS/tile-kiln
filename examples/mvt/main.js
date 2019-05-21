@@ -28,7 +28,7 @@ export function main() {
     renderer.setStyles(styleDoc);
 
     // Read the tile data
-    readMVT(tileHref, drawTile);
+    readMVT(tileHref, 512, drawTile);
   }
 
   function drawTile(err, tile) {
@@ -37,9 +37,7 @@ export function main() {
     // Draw this tile to the renderer canvas
     var zoom = 8;
     var size = 512;
-    var sx = 0;
-    var sy = 0;
-    renderer.drawMVT(tile, zoom, size, sx, sy);
+    renderer.drawMVT(tile, zoom, size);
 
     // Copy the renderer canvas onto our display canvas
     dctx.drawImage(renderer.canvas, 0, 0);

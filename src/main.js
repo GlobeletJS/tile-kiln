@@ -1,5 +1,5 @@
 import { derefLayers } from "./deref.js";
-import { initFeatureGetter } from "./getFeatures.js";
+import { getFeatures } from "./getFeatures.js";
 import { initRenderer } from "./renderer.js";
 
 export function init(canvSize) {
@@ -27,16 +27,20 @@ export function init(canvSize) {
     return;
   }
 
-  function drawMVT(tile, zoom, size, sx, sy) {
-    // Input tile is a Mapbox Vector Tile, already parsed by 'vector-tile-js'
+  function drawMVT(tile, zoom, size) {
+    // Input tile is a JSON object of the form 
+    //   { layerName1: FeatureCollection1, layerName2: ... }
+    // where FeatureCollection is a GeoJSON object
     ctx.clearRect(0, 0, canvSize, canvSize);
 
-    var getFeatures = initFeatureGetter(size, sx, sy);
-    styles.layers.forEach( style => drawLayer(style, zoom, tile, getFeatures) );
+    //console.time('drawMVT');
+    styles.layers.forEach( style => drawLayer(style, zoom, tile) );
+    //console.timeEnd('drawMVT');
+    
     return;
   }
 
-  function drawLayer(style, zoom, tile, getFeatures) {
+  function drawLayer(style, zoom, jsonLayers) {
     // Quick exits if this layer is not meant to be displayed
     if (style.layout && style.layout["visibility"] === "none") return;
     if (style.minzoom !== undefined && zoom < style.minzoom) return;
@@ -51,15 +55,10 @@ export function init(canvSize) {
     // If this is the background layer, we don't need any data
     if (style.type === "background") return renderer.fillBackground(style, zoom);
 
-    var mapLayer = findMapLayer(style["source-layer"], tile.layers);
+    var mapLayer = jsonLayers[ style["source-layer"] ];
     var mapData = getFeatures(mapLayer, style.filter);
     if (!mapData) return;
 
     return renderer.drawData(style, zoom, mapData);
   }
-}
-
-function findMapLayer(name, layers) {
-  if (name === undefined) return false;
-  return Object.values(layers).find(layer => layer.name === name);
 }

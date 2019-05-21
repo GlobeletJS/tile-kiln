@@ -1,23 +1,13 @@
-export function initFeatureGetter(size, sx, sy) {
-  // This closure just saves the size, sx, sy parameters
+export function getFeatures(layer, filterObj) {
+  // Based on https://observablehq.com/@mbostock/d3-mapbox-vector-tiles
+  if (!layer) return;
+  var filter = prepFilter(filterObj);
 
-  function getFeatures(layer, filterObj) {
-    // Based on https://observablehq.com/@mbostock/d3-mapbox-vector-tiles
-    if (!layer) return;
-    var filter = prepFilter(filterObj);
+  var features = layer.features.filter(filter);
 
-    const features = [];
-    for (let i = 0; i < layer.length; ++i) {
-      const feature = layer.feature(i).toGeoJSON(size, sx, sy);
-      if (filter(feature)) features.push(feature);
-    }
-
-    return (features.length < 1)
-      ? false
-      : { type: "FeatureCollection", features: features };
-  }
-
-  return getFeatures;
+  return (features.length < 1)
+    ? false
+    : { type: "FeatureCollection", features: features };
 }
 
 function prepFilter(filterObj) {
