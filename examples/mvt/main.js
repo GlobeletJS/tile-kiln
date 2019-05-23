@@ -2,7 +2,7 @@
 
 import { initDisplay } from "./display.js";
 import { readMVT, readJSON } from "./readVector.js";
-import { derefLayers } from "./deref.js";
+import { prepStyle } from "./prepStyle.js";
 import * as vectormap from "../../dist/vectormap.bundle.js";
 
 //var tileHref = "data/terrain-v2_streets-v7_7-29-53.mvt";
@@ -22,14 +22,11 @@ export function main() {
   const renderer = vectormap.init(512);
 
   // Get the style info
-  readJSON(styleHref, setup);
+  readJSON(styleHref, (err, styles) => prepStyle(err, styles, loadTile) );
 
-  function setup(err, styleDoc) {
+  function loadTile(err, preppedStyle) {
     if (err) return console.log(err);
-    styleDoc.layers = derefLayers(styleDoc.layers);
-    renderer.setStyles(styleDoc.layers);
-
-    // Read the tile data
+    renderer.setStyles(preppedStyle.layers);
     readMVT(tileHref, 512, drawTile);
   }
 

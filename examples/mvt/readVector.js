@@ -44,6 +44,17 @@ function layerToJSON(layer, size) {
   return { type: "FeatureCollection", features: features };
 }
 
+export function readMultiJSON(hrefs, callback) {
+  var results = {};
+  hrefs.forEach( href => readJSON(href, checkAll) );
+
+  function checkAll(err, data, href) {
+    if (err) callback(err);
+    results[href] = data;
+    if (Object.keys(results).length === hrefs.length) callback(null, results);
+  }
+}
+
 export function readJSON(dataHref, callback) {
   // Input dataHref is the path to a file containing JSON
 
@@ -51,7 +62,7 @@ export function readJSON(dataHref, callback) {
   xhrGet(dataHref, "text", parseJSON);
 
   function parseJSON(err) {
-    callback( null, JSON.parse(this.responseText) );
+    callback( null, JSON.parse(this.responseText), dataHref );
   }
 }
 
