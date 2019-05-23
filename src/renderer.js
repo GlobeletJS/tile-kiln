@@ -9,11 +9,26 @@ export function initRenderer(ctx) {
   const path = d3.geoPath(null, ctx);
 
   return {
-    drawData,
     fillBackground,
+    drawRaster,
+    drawJSON,
   };
 
-  function drawData(style, zoom, mapData) {
+  function fillBackground(style, zoom) {
+    setStyle("fillStyle", style.paint["background-color"], zoom);
+    setStyle("globalAlpha", style.paint["background-opacity"], zoom);
+    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  }
+
+  function drawRaster(style, zoom, image) {
+    setStyle("globalAlpha", style.paint["raster-opacity"], zoom);
+    // Missing raster-hue-rotate, raster-brightness-min, raster-brightness-max,
+    // raster-saturation, raster-contrast
+    ctx.drawImage(image, 0, 0);
+    return;
+  }
+
+  function drawJSON(style, zoom, mapData) {
     // Input style is ONE layer from a Mapbox style document
     // Input mapData is a GeoJSON "FeatureCollection" 
     //console.log("drawData: processing style id = " + style.id);
@@ -36,12 +51,6 @@ export function initRenderer(ctx) {
     return;
   }
 
-  function fillBackground(style, zoom) {
-    setStyle("fillStyle", style.paint["background-color"], zoom);
-    setStyle("globalAlpha", style.paint["background-opacity"], zoom);
-    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  }
-
   function renderCircle(style, zoom, data) {
     ctx.beginPath();
     var paint = style.paint;
@@ -49,8 +58,8 @@ export function initRenderer(ctx) {
       var radius = evalStyle(paint["circle-radius"], zoom);
       path.pointRadius(radius);
     }
-    setStyle("fillStyle", paint["circle-color"]);
-    setStyle("globalAlpha", paint["circle-opacity"]);
+    setStyle("fillStyle", paint["circle-color"], zoom);
+    setStyle("globalAlpha", paint["circle-opacity"], zoom);
     // Missing circle-blur, circle-translate, circle-translate-anchor,
     //  and circle-stroke stuff
     path(data);

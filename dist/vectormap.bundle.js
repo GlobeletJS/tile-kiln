@@ -1,60 +1,3 @@
-// From mapbox-gl-js, style-spec/deref.js
-const refProperties = [
-  'type', 
-  'source', 
-  'source-layer', 
-  'minzoom', 
-  'maxzoom', 
-  'filter', 
-  'layout'
-];
-
-/**
- * Given an array of layers, some of which may contain `ref` properties
- * whose value is the `id` of another property, return a new array where
- * such layers have been augmented with the 'type', 'source', etc. properties
- * from the parent layer, and the `ref` property has been removed.
- *
- * The input is not modified. The output may contain references to portions
- * of the input.
- *
- * @private
- * @param {Array<Layer>} layers
- * @returns {Array<Layer>}
- */
-function derefLayers(layers) {
-  layers = layers.slice(); // ??? What are we trying to achieve here?
-
-  const map = Object.create(null); // stackoverflow.com/a/21079232/10082269
-  layers.forEach( layer => { map[layer.id] = layer; } );
-
-  for (let i = 0; i < layers.length; i++) {
-    if ('ref' in layers[i]) {
-      layers[i] = deref(layers[i], map[layers[i].ref]);
-    }
-  }
-
-  return layers;
-}
-
-function deref(layer, parent) {
-  const result = {};
-
-  for (const k in layer) {
-    if (k !== 'ref') {
-      result[k] = layer[k];
-    }
-  }
-
-  refProperties.forEach((k) => {
-    if (k in parent) {
-      result[k] = parent[k];
-    }
-  });
-
-  return result;
-}
-
 function getFeatures(layer, filterObj) {
   // Based on https://observablehq.com/@mbostock/d3-mapbox-vector-tiles
   if (!layer) return;
@@ -961,11 +904,26 @@ function initRenderer(ctx) {
   const path = index(null, ctx);
 
   return {
-    drawData,
     fillBackground,
+    drawRaster,
+    drawJSON,
   };
 
-  function drawData(style, zoom, mapData) {
+  function fillBackground(style, zoom) {
+    setStyle("fillStyle", style.paint["background-color"], zoom);
+    setStyle("globalAlpha", style.paint["background-opacity"], zoom);
+    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  }
+
+  function drawRaster(style, zoom, image) {
+    setStyle("globalAlpha", style.paint["raster-opacity"], zoom);
+    // Missing raster-hue-rotate, raster-brightness-min, raster-brightness-max,
+    // raster-saturation, raster-contrast
+    ctx.drawImage(image, 0, 0);
+    return;
+  }
+
+  function drawJSON(style, zoom, mapData) {
     // Input style is ONE layer from a Mapbox style document
     // Input mapData is a GeoJSON "FeatureCollection" 
     //console.log("drawData: processing style id = " + style.id);
@@ -988,12 +946,6 @@ function initRenderer(ctx) {
     return;
   }
 
-  function fillBackground(style, zoom) {
-    setStyle("fillStyle", style.paint["background-color"], zoom);
-    setStyle("globalAlpha", style.paint["background-opacity"], zoom);
-    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  }
-
   function renderCircle(style, zoom, data) {
     ctx.beginPath();
     var paint = style.paint;
@@ -1001,8 +953,8 @@ function initRenderer(ctx) {
       var radius = evalStyle(paint["circle-radius"], zoom);
       path.pointRadius(radius);
     }
-    setStyle("fillStyle", paint["circle-color"]);
-    setStyle("globalAlpha", paint["circle-opacity"]);
+    setStyle("fillStyle", paint["circle-color"], zoom);
+    setStyle("globalAlpha", paint["circle-opacity"], zoom);
     // Missing circle-blur, circle-translate, circle-translate-anchor,
     //  and circle-stroke stuff
     path(data);
@@ -1054,55 +1006,57 @@ function init(canvSize) {
   const ctx = canvas.getContext("2d");
   ctx.save();
 
-  const styles = {};
   const renderer = initRenderer(ctx);
+
+  var styleLayers;
+  function setStyles(layers) {
+    // Input layers is the .layers property of a Mapbox style document.
+    // Specification: https://docs.mapbox.com/mapbox-gl-js/style-spec/
+    styleLayers = layers;
+  }
 
   return {
     setStyles,
-    drawMVT,
+    drawTile,
     canvas,
   };
 
-  function setStyles(styleDoc) {
-    // Input styleDoc is a Mapbox style document, following the specification at
-    // https://docs.mapbox.com/mapbox-gl-js/style-spec/
-    styles.layers = derefLayers(styleDoc.layers);
-    return;
-  }
-
-  function drawMVT(tile, zoom, size) {
+  function drawTile(zoom, sources) {
     // Input tile is a JSON object of the form 
     //   { layerName1: FeatureCollection1, layerName2: ... }
     // where FeatureCollection is a GeoJSON object
     ctx.clearRect(0, 0, canvSize, canvSize);
 
     //console.time('drawMVT');
-    styles.layers.forEach( style => drawLayer(style, zoom, tile) );
+    styleLayers.forEach( style => drawLayer(style, zoom, sources) );
     //console.timeEnd('drawMVT');
     
     return;
   }
 
-  function drawLayer(style, zoom, jsonLayers) {
+  function drawLayer(style, zoom, sources) {
     // Quick exits if this layer is not meant to be displayed
     if (style.layout && style.layout["visibility"] === "none") return;
     if (style.minzoom !== undefined && zoom < style.minzoom) return;
     if (style.maxzoom !== undefined && zoom > style.maxzoom) return;
 
-    // Start from default styles: restore what we saved
+    // Start from default canvas state: restore what we saved
     ctx.restore();
     // restore POPS the saved state off a stack. So if we want to restore again
     // later, we need to re-save what we just restored
     ctx.save();
 
-    // If this is the background layer, we don't need any data
-    if (style.type === "background") return renderer.fillBackground(style, zoom);
-
+    if (style.type === "background") {
+      return renderer.fillBackground(style, zoom);
+    } else if (style.type === "raster") {
+      var image = sources[ style["source"] ];
+      return renderer.drawRaster(style, zoom, image);
+    }
+    var jsonLayers = sources[ style["source"] ];
     var mapLayer = jsonLayers[ style["source-layer"] ];
     var mapData = getFeatures(mapLayer, style.filter);
     if (!mapData) return;
-
-    return renderer.drawData(style, zoom, mapData);
+    return renderer.drawJSON(style, zoom, mapData);
   }
 }
 

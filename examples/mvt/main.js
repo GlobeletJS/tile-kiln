@@ -2,6 +2,7 @@
 
 import { initDisplay } from "./display.js";
 import { readMVT, readJSON } from "./readVector.js";
+import { derefLayers } from "./deref.js";
 import * as vectormap from "../../dist/vectormap.bundle.js";
 
 //var tileHref = "data/terrain-v2_streets-v7_7-29-53.mvt";
@@ -17,7 +18,7 @@ export function main() {
   // Initialize the display canvas and rendering context
   const dctx = initDisplay('map');
 
-  // Initialize vector renderer
+  // Initialize vector renderer, starting from an empty styleset
   const renderer = vectormap.init(512);
 
   // Get the style info
@@ -25,19 +26,25 @@ export function main() {
 
   function setup(err, styleDoc) {
     if (err) return console.log(err);
-    renderer.setStyles(styleDoc);
+    styleDoc.layers = derefLayers(styleDoc.layers);
+    renderer.setStyles(styleDoc.layers);
 
     // Read the tile data
     readMVT(tileHref, 512, drawTile);
   }
 
-  function drawTile(err, tile) {
+  function drawTile(err, jsonData) {
     if (err) return console.log(err);
+
+    var tile = {
+      "sources": {
+        "composite": jsonData,
+      },
+    }
 
     // Draw this tile to the renderer canvas
     var zoom = 8;
-    var size = 512;
-    renderer.drawMVT(tile, zoom, size);
+    renderer.drawTile(zoom, tile.sources);
 
     // Copy the renderer canvas onto our display canvas
     dctx.drawImage(renderer.canvas, 0, 0);
