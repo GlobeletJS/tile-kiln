@@ -74,8 +74,14 @@ function prepFilter(filterObj) {
 function initFeatureValGetter(key) {
   switch (key) {
     case "$type":
-      // TODO: data includes MultiLineString, MultiPolygon, etc-NOT IN SPEC
-      return f => f.geometry.type;
+      // NOTE: data includes MultiLineString, MultiPolygon, etc-NOT IN SPEC
+      return f => {
+        let t = f.geometry.type;
+        if (t === "MultiPoint") return "Point";
+        if (t === "MultiLineString") return "LineString";
+        if (t === "MultiPolygon") return "Polygon";
+        return t;
+      };
     case "$id":
       return f => f.id;
     default:

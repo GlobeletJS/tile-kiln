@@ -80,3 +80,21 @@ function xhrGet(href, type, callback) {
   }
   return req;
 }
+
+export function loadImage(href, callback) {
+  const img = new Image();
+  img.onerror = () => callback("ERROR in loadImage for href " + href);
+  img.onload = checkImg;
+  img.crossOrigin = "anonymous";
+  img.src = href;
+
+  function checkImg() {
+    if (img.complete && img.naturalWidth !== 0) {
+      return callback(null, img);
+    } else {
+      return callback("ERROR in loadImage for href " + href);
+    }
+  }
+
+  return img;
+}

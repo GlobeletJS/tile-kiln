@@ -26,9 +26,6 @@ export function init(canvSize) {
   };
 
   function drawTile(zoom, sources) {
-    // Input tile is a JSON object of the form 
-    //   { layerName1: FeatureCollection1, layerName2: ... }
-    // where FeatureCollection is a GeoJSON object
     ctx.clearRect(0, 0, canvSize, canvSize);
 
     //console.time('drawMVT');
@@ -54,7 +51,7 @@ export function init(canvSize) {
       return renderer.fillBackground(style, zoom);
     } else if (style.type === "raster") {
       var image = sources[ style["source"] ];
-      return renderer.drawRaster(style, zoom, image);
+      return renderer.drawRaster(style, zoom, image, canvSize);
     }
     var jsonLayers = sources[ style["source"] ];
     var mapLayer = jsonLayers[ style["source-layer"] ];

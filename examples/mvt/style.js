@@ -1,7 +1,12 @@
-import { readJSON } from "./readVector.js";
+import { readJSON } from "./read.js";
 import { derefLayers } from "./deref.js";
 
 const mbToken = "pk.eyJ1IjoiamhlbWJkIiwiYSI6ImNqcHpueHpyZjBlMjAzeG9kNG9oNzI2NTYifQ.K7fqhk2Z2YZ8NIV94M-5nA";
+
+export function loadStyle(styleHref, callback) {
+  var process = (err, doc) => prepStyle(err, doc, callback);
+  return readJSON(styleHref, process);
+}
 
 export function prepStyle(err, styleDoc, callback) {
   if (err) return callback(err);
@@ -9,13 +14,12 @@ export function prepStyle(err, styleDoc, callback) {
 
   // Prepare the "sources" object
   var sKeys = Object.keys(styleDoc.sources);
-  var numDone = 0;
-  sKeys.forEach( key => prepSource(styleDoc.sources, key, moveOn) );
+  var numToDo = sKeys.length;
+  sKeys.forEach( key => prepSource(styleDoc.sources, key, finishAll) );
     
-  function moveOn(err) {
+  function finishAll(err) {
     if (err) return callback(err);
-    numDone ++;
-    if (numDone == sKeys.length) callback(null, styleDoc);
+    if (--numToDo == 0) callback(null, styleDoc);
   }
 }
 
@@ -24,6 +28,7 @@ function prepSource(sources, key, callback) {
   var url = source.url;
   if (url === undefined) return callback(null); // No change
 
+  // Load the referenced TileJSON document
   url = expandURL(url, mbToken);
   readJSON(url, merge);
 

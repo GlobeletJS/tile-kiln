@@ -74,8 +74,14 @@ function prepFilter(filterObj) {
 function initFeatureValGetter(key) {
   switch (key) {
     case "$type":
-      // TODO: data includes MultiLineString, MultiPolygon, etc-NOT IN SPEC
-      return f => f.geometry.type;
+      // NOTE: data includes MultiLineString, MultiPolygon, etc-NOT IN SPEC
+      return f => {
+        let t = f.geometry.type;
+        if (t === "MultiPoint") return "Point";
+        if (t === "MultiLineString") return "LineString";
+        if (t === "MultiPolygon") return "Polygon";
+        return t;
+      };
     case "$id":
       return f => f.id;
     default:
@@ -915,30 +921,35 @@ function initRenderer(ctx) {
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   }
 
-  function drawRaster(style, zoom, image) {
-    setStyle("globalAlpha", style.paint["raster-opacity"], zoom);
-    // Missing raster-hue-rotate, raster-brightness-min, raster-brightness-max,
-    // raster-saturation, raster-contrast
-    ctx.drawImage(image, 0, 0);
+  function drawRaster(style, zoom, image, size) {
+    var paint = style.paint;
+    if (paint !== undefined) {
+      setStyle("globalAlpha", paint["raster-opacity"], zoom);
+      // Missing raster-hue-rotate, raster-brightness-min/max,
+      // raster-saturation, raster-contrast
+    }
+    // TODO: we are forcing one tile to cover the canvas!
+    // In some cases (e.g. Mapbox Satellite Streets) the raster tiles may
+    // be half the size of the vector canvas, so we need 4 of them...
+    ctx.drawImage(image, 0, 0, size, size);
     return;
   }
 
   function drawJSON(style, zoom, mapData) {
     // Input style is ONE layer from a Mapbox style document
     // Input mapData is a GeoJSON "FeatureCollection" 
-    //console.log("drawData: processing style id = " + style.id);
 
     switch (style.type) {
-      case "circle" :  // Point or MultiPoint geometry
+      case "circle":  // Point or MultiPoint geometry
         renderCircle(style, zoom, mapData);
         break;
-      case "line" :    // LineString, MultiLineString, Polygon, or MultiPolygon
+      case "line":    // LineString, MultiLineString, Polygon, or MultiPolygon
         renderLine(style, zoom, mapData);
         break;
-      case "fill" :    // Polygon or MultiPolygon (maybe also linestrings?)
+      case "fill":    // Polygon or MultiPolygon (maybe also linestrings?)
         renderFill(style, zoom, mapData);
         break;
-      case "symbol" :  // Labels
+      case "symbol":  // Labels
       default :
         //console.log("ERROR in drawMVT: layer.type = " + style.type +
         //    " not supported!");
@@ -1022,9 +1033,6 @@ function init(canvSize) {
   };
 
   function drawTile(zoom, sources) {
-    // Input tile is a JSON object of the form 
-    //   { layerName1: FeatureCollection1, layerName2: ... }
-    // where FeatureCollection is a GeoJSON object
     ctx.clearRect(0, 0, canvSize, canvSize);
 
     //console.time('drawMVT');
@@ -1050,7 +1058,7 @@ function init(canvSize) {
       return renderer.fillBackground(style, zoom);
     } else if (style.type === "raster") {
       var image = sources[ style["source"] ];
-      return renderer.drawRaster(style, zoom, image);
+      return renderer.drawRaster(style, zoom, image, canvSize);
     }
     var jsonLayers = sources[ style["source"] ];
     var mapLayer = jsonLayers[ style["source-layer"] ];

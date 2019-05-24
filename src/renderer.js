@@ -20,30 +20,35 @@ export function initRenderer(ctx) {
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   }
 
-  function drawRaster(style, zoom, image) {
-    setStyle("globalAlpha", style.paint["raster-opacity"], zoom);
-    // Missing raster-hue-rotate, raster-brightness-min, raster-brightness-max,
-    // raster-saturation, raster-contrast
-    ctx.drawImage(image, 0, 0);
+  function drawRaster(style, zoom, image, size) {
+    var paint = style.paint;
+    if (paint !== undefined) {
+      setStyle("globalAlpha", paint["raster-opacity"], zoom);
+      // Missing raster-hue-rotate, raster-brightness-min/max,
+      // raster-saturation, raster-contrast
+    }
+    // TODO: we are forcing one tile to cover the canvas!
+    // In some cases (e.g. Mapbox Satellite Streets) the raster tiles may
+    // be half the size of the vector canvas, so we need 4 of them...
+    ctx.drawImage(image, 0, 0, size, size);
     return;
   }
 
   function drawJSON(style, zoom, mapData) {
     // Input style is ONE layer from a Mapbox style document
     // Input mapData is a GeoJSON "FeatureCollection" 
-    //console.log("drawData: processing style id = " + style.id);
 
     switch (style.type) {
-      case "circle" :  // Point or MultiPoint geometry
+      case "circle":  // Point or MultiPoint geometry
         renderCircle(style, zoom, mapData);
         break;
-      case "line" :    // LineString, MultiLineString, Polygon, or MultiPolygon
+      case "line":    // LineString, MultiLineString, Polygon, or MultiPolygon
         renderLine(style, zoom, mapData);
         break;
-      case "fill" :    // Polygon or MultiPolygon (maybe also linestrings?)
+      case "fill":    // Polygon or MultiPolygon (maybe also linestrings?)
         renderFill(style, zoom, mapData);
         break;
-      case "symbol" :  // Labels
+      case "symbol":  // Labels
       default :
         //console.log("ERROR in drawMVT: layer.type = " + style.type +
         //    " not supported!");
