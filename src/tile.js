@@ -15,7 +15,9 @@ export function initTileFactory(size, sources) {
     const tile = {
       z, x, y,
       sources: {},
-      ready: false,
+      img: new Image(),
+      loaded: false,
+      rendered: false,
     };
 
     var numToDo = tileSourceKeys.length;
@@ -37,7 +39,7 @@ export function initTileFactory(size, sources) {
       tile.sources[key] = data;
       if (--numToDo > 0) return;
 
-      tile.ready = true;
+      tile.loaded = true;
       return callback(null, tile);
     }
     return tile;

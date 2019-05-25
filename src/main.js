@@ -1,62 +1,33 @@
-import { getFeatures } from "./getFeatures.js";
+import { loadStyle } from "./style.js";
+import { initTileFactory } from "./tile.js";
 import { initRenderer } from "./renderer.js";
 
-export function init(canvSize) {
-  // Create canvas for rendering, set drawingbuffer size
-  const canvas = document.createElement("canvas");
-  canvas.width = canvSize;
-  canvas.height = canvSize;
-  // Initialize rendering context and save default styles
-  const ctx = canvas.getContext("2d");
-  ctx.save();
+export function init(canvSize, styleHref, callback) {
+  // TODO: input object with defaults, and Mapbox API token
+  var styleDoc, tileFactory, renderer;
 
-  const renderer = initRenderer(ctx);
+  // Get the style info
+  loadStyle(styleHref, setup);
 
-  var styleLayers;
-  function setStyles(layers) {
-    // Input layers is the .layers property of a Mapbox style document.
-    // Specification: https://docs.mapbox.com/mapbox-gl-js/style-spec/
-    styleLayers = layers;
+  var api = { create };
+
+  return api;
+
+  function setup(err, preppedStyle) {
+    if (err) callback(err);
+    styleDoc = preppedStyle;
+    tileFactory = initTileFactory(canvSize, styleDoc.sources);
+    renderer = initRenderer(canvSize, styleDoc.layers);
+    api.redraw = renderer.drawTile;
+    return callback(null, api);
   }
 
-  return {
-    setStyles,
-    drawTile,
-    canvas,
-  };
-
-  function drawTile(zoom, sources) {
-    ctx.clearRect(0, 0, canvSize, canvSize);
-
-    //console.time('drawMVT');
-    styleLayers.forEach( style => drawLayer(style, zoom, sources) );
-    //console.timeEnd('drawMVT');
-    
-    return;
-  }
-
-  function drawLayer(style, zoom, sources) {
-    // Quick exits if this layer is not meant to be displayed
-    if (style.layout && style.layout["visibility"] === "none") return;
-    if (style.minzoom !== undefined && zoom < style.minzoom) return;
-    if (style.maxzoom !== undefined && zoom > style.maxzoom) return;
-
-    // Start from default canvas state: restore what we saved
-    ctx.restore();
-    // restore POPS the saved state off a stack. So if we want to restore again
-    // later, we need to re-save what we just restored
-    ctx.save();
-
-    if (style.type === "background") {
-      return renderer.fillBackground(style, zoom);
-    } else if (style.type === "raster") {
-      var image = sources[ style["source"] ];
-      return renderer.drawRaster(style, zoom, image, canvSize);
+  function create(z, x, y, cb) {
+    var tile = tileFactory(z, x, y, render);
+    function render(err) {
+      if (err) cb(err);
+      renderer.drawTile(tile, cb);
     }
-    var jsonLayers = sources[ style["source"] ];
-    var mapLayer = jsonLayers[ style["source-layer"] ];
-    var mapData = getFeatures(mapLayer, style.filter);
-    if (!mapData) return;
-    return renderer.drawJSON(style, zoom, mapData);
+    return;
   }
 }

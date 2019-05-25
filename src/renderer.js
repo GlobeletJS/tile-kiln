@@ -1,108 +1,59 @@
-import * as d3 from 'd3-geo';
-import { evalStyle } from "./styleFunction.js";
+import { getFeatures } from "./getFeatures.js";
+import { initPainter } from "./painter.js";
 
-export function initRenderer(ctx) {
-  // Input ctx is a Canvas 2D rendering context
+export function initRenderer(canvSize, styleLayers) {
+  // Input styleLayers points to the .layers property of a Mapbox style document
+  // Specification: https://docs.mapbox.com/mapbox-gl-js/style-spec/
 
-  // Initialize the D3 path generator. 
-  // First param is the projection. Keep the data's native coordinates for now
-  const path = d3.geoPath(null, ctx);
+  // Create canvas for rendering, set drawingbuffer size
+  const canvas = document.createElement("canvas");
+  canvas.width = canvSize;
+  canvas.height = canvSize;
+
+  // Initialize rendering context and save default styles
+  const ctx = canvas.getContext("2d");
+  ctx.save();
+
+  // Initialize painter: paints a single layer onto the canvas
+  const painter = initPainter(ctx);
 
   return {
-    fillBackground,
-    drawRaster,
-    drawJSON,
+    drawTile,
+    canvas,
   };
 
-  function fillBackground(style, zoom) {
-    setStyle("fillStyle", style.paint["background-color"], zoom);
-    setStyle("globalAlpha", style.paint["background-opacity"], zoom);
-    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  }
-
-  function drawRaster(style, zoom, image, size) {
-    var paint = style.paint;
-    if (paint !== undefined) {
-      setStyle("globalAlpha", paint["raster-opacity"], zoom);
-      // Missing raster-hue-rotate, raster-brightness-min/max,
-      // raster-saturation, raster-contrast
+  function drawTile(tile, callback = () => undefined) {
+    ctx.clearRect(0, 0, canvSize, canvSize);
+    styleLayers.forEach( style => drawLayer(style, tile.z, tile.sources) );
+    tile.img.onload = checkImg;
+    tile.img.src = canvas.toDataURL();
+    
+    function checkImg() {
+      tile.rendered = true;
+      return callback(null, tile);
     }
-    // TODO: we are forcing one tile to cover the canvas!
-    // In some cases (e.g. Mapbox Satellite Streets) the raster tiles may
-    // be half the size of the vector canvas, so we need 4 of them...
-    ctx.drawImage(image, 0, 0, size, size);
-    return;
   }
 
-  function drawJSON(style, zoom, mapData) {
-    // Input style is ONE layer from a Mapbox style document
-    // Input mapData is a GeoJSON "FeatureCollection" 
+  function drawLayer(style, zoom, sources) {
+    // Quick exits if this layer is not meant to be displayed
+    if (style.layout && style.layout["visibility"] === "none") return;
+    if (style.minzoom !== undefined && zoom < style.minzoom) return;
+    if (style.maxzoom !== undefined && zoom > style.maxzoom) return;
 
-    switch (style.type) {
-      case "circle":  // Point or MultiPoint geometry
-        renderCircle(style, zoom, mapData);
-        break;
-      case "line":    // LineString, MultiLineString, Polygon, or MultiPolygon
-        renderLine(style, zoom, mapData);
-        break;
-      case "fill":    // Polygon or MultiPolygon (maybe also linestrings?)
-        renderFill(style, zoom, mapData);
-        break;
-      case "symbol":  // Labels
-      default :
-        //console.log("ERROR in drawMVT: layer.type = " + style.type +
-        //    " not supported!");
-    }
-    return;
-  }
+    // Start from default canvas state: restore what we saved
+    ctx.restore();
+    // restore POPS the saved state off a stack. So if we want to restore again
+    // later, we need to re-save what we just restored
+    ctx.save();
 
-  function renderCircle(style, zoom, data) {
-    ctx.beginPath();
-    var paint = style.paint;
-    if (paint["circle-radius"]) {
-      var radius = evalStyle(paint["circle-radius"], zoom);
-      path.pointRadius(radius);
-    }
-    setStyle("fillStyle", paint["circle-color"], zoom);
-    setStyle("globalAlpha", paint["circle-opacity"], zoom);
-    // Missing circle-blur, circle-translate, circle-translate-anchor,
-    //  and circle-stroke stuff
-    path(data);
-    ctx.fill();
-  }
+    if (style.type === "background") return painter.fillBackground(style, zoom);
 
-  function renderLine(style, zoom, data) {
-    ctx.beginPath();
-    setStyle("lineCap", style.layout["line-cap"], zoom);
-    setStyle("lineJoin", style.layout["line-join"], zoom);
-    setStyle("miterLimit", style.layout["line-miter-limit"], zoom);
-    // Missing line-round-limit
-    setStyle("strokeStyle", style.paint["line-color"], zoom);
-    setStyle("lineWidth", style.paint["line-width"], zoom);
-    setStyle("globalAlpha", style.paint["line-opacity"], zoom);
-    // Missing line-gap-width, line-translate, line-translate-anchor,
-    //  line-offset, line-blur, line-gradient, line-pattern, line-dasharray
-    path(data);
-    ctx.stroke();
-  }
+    var source = sources[ style["source"] ];
+    if (style.type === "raster") return painter.drawRaster(style, zoom, source);
 
-  function renderFill(style, zoom, data) {
-    ctx.beginPath();
-    setStyle("fillStyle", style.paint["fill-color"], zoom);
-    setStyle("globalAlpha", style.paint["fill-opacity"], zoom);
-    // Missing fill-outline-color, fill-translate, fill-translate-anchor,
-    //  fill-pattern
-    path(data);
-    ctx.fill();
-  }
-
-  function setStyle(option, val, zoom) { // Nested for access to ctx
-    var calcVal = evalStyle(val, zoom);
-    // If val was not set, return without updating state
-    // TODO: is this necessary? Canvas 2D already doesn't apply invalid values
-    if (calcVal === undefined) return;
-
-    ctx[option] = calcVal;
-    return;
+    var mapLayer = source[ style["source-layer"] ];
+    var mapData = getFeatures(mapLayer, style.filter);
+    if (!mapData) return;
+    return painter.drawJSON(style, zoom, mapData);
   }
 }
