@@ -1,9 +1,9 @@
 'use strict';
 
-import * as vectormap from "../../dist/vectormap.bundle.js";
+import * as tilekiln from "../../dist/tilekiln.bundle.js";
 
 export function main() {
   var dataHref = "topoquantize_to_geo.json";
 
-  var map = vectormap.init('map', dataHref, 'geojson');
+  var map = tilekiln.init('map', dataHref, 'geojson');
 }

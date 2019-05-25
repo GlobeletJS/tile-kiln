@@ -9,28 +9,36 @@ export function init(params) {
   var mbToken  = params.token;   // May be undefined
   var callback = params.callback || ( () => undefined );
 
-  var styleDoc, tileFactory, renderer;
-  var ready = false;
+  // Declare some global functions that will be defined inside a callback
+  var tileFactory, renderer;
 
-  // Get the style info
+  // Get the style info  TODO: allow user to supply style object directly
   loadStyle(styleURL, mbToken, setup);
 
-  var api = { create };
+  const api = { // Initialize properties, update when styles load
+    style: {},    // WARNING: directly modifiable from calling program
+    create: () => undefined,
+    redraw: () => undefined,
+    ready: false,
+  };
 
   return api;
 
-  function setup(err, preppedStyle) {
+  function setup(err, styleDoc) {
     if (err) callback(err);
-    styleDoc = preppedStyle;
     tileFactory = initTileFactory(canvSize, styleDoc.sources);
     renderer = initRenderer(canvSize, styleDoc.layers);
+
+    // Update api
+    api.style = styleDoc;
+    api.create = create;
     api.redraw = renderer.drawTile;
-    ready = true;
+    api.ready = true;
+
     return callback(null, api);
   }
 
   function create(z, x, y, cb) {
-    if (!ready) return;
     var tile = tileFactory(z, x, y, render);
     function render(err) {
       if (err) cb(err);

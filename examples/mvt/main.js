@@ -1,7 +1,7 @@
 'use strict';
 
 import { initDisplay } from "./display.js";
-import * as tilekiln from "../../dist/vectormap.bundle.js";
+import * as tilekiln from "../../dist/tilekiln.bundle.js";
 
 export function main() {
   // Initialize the display canvas and rendering context

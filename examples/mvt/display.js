@@ -5,7 +5,7 @@ export function initDisplay(divID) {
   var displayDiv = document.getElementById(divID);
 
   // Add the main canvas, which fills the whole display div
-  var canvas = addChild( displayDiv, 'canvas', 'vectormap-canvas' );
+  var canvas = addChild( displayDiv, 'canvas', 'display-canvas');
   // Initialize the main rendering context
   var context = canvas.getContext("2d");
 

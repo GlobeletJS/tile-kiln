@@ -1,8 +1,8 @@
 {
-  "name": "vectormap",
+  "name": "tilekiln",
   "version": "0.0.1",
-  "description": "Basic vector tile rendering with Canvas 2D",
-  "main": "dist/vectormap.bundle.js",
+  "description": "Map tile rendering guided by a Mapbox style document",
+  "main": "dist/tilekiln.bundle.js",
   "files": [
     "dist"
   ],
@@ -11,26 +11,26 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "npm run build-module && npm run build-examples",
     "build-module": "rollup -c build/rollup.config.js",
-    "build-examples": "npm run rollup-examples && npm run copy-css",
-    "rollup-examples": "cd examples && rollup -c",
-    "copy-css": "echo examples/*/ | xargs -n 1 cp dist/vectormap.css"
+    "build-examples": "cd examples && rollup -c"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jjhembd/vectormap.git"
+    "url": "git+https://github.com/jjhembd/tilekiln.git"
   },
   "keywords": [
-    "vector",
-    "tile",
     "map",
+    "tile",
+    "style",
+    "raster",
+    "vector",
     "canvas"
   ],
   "author": "Jeshurun Hembd",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/jjhembd/vectormap/issues"
+    "url": "https://github.com/jjhembd/tilekiln/issues"
   },
-  "homepage": "https://github.com/jjhembd/vectormap#readme",
+  "homepage": "https://github.com/jjhembd/tilekiln#readme",
   "devDependencies": {
     "http-server": "^0.11.1",
     "pbf": "github:jjhembd/pbf",
