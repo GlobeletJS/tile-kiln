@@ -1462,21 +1462,20 @@ function deref(layer, parent) {
   return result;
 }
 
-const mbToken = "pk.eyJ1IjoiamhlbWJkIiwiYSI6ImNqcHpueHpyZjBlMjAzeG9kNG9oNzI2NTYifQ.K7fqhk2Z2YZ8NIV94M-5nA";
-
-function loadStyle(styleHref, callback) {
-  var process = (err, doc) => prepStyle(err, doc, callback);
-  return readJSON(styleHref, process);
+function loadStyle(styleHref, mapboxToken, callback) {
+  var url = expandStyleURL(styleHref, mapboxToken);
+  var process = (err, doc) => prepStyle(err, doc, mapboxToken, callback);
+  return readJSON(url, process);
 }
 
-function prepStyle(err, styleDoc, callback) {
+function prepStyle(err, styleDoc, token, callback) {
   if (err) return callback(err);
   styleDoc.layers = derefLayers(styleDoc.layers);
 
   // Prepare the "sources" object
   var sKeys = Object.keys(styleDoc.sources);
   var numToDo = sKeys.length;
-  sKeys.forEach( key => prepSource(styleDoc.sources, key, finishAll) );
+  sKeys.forEach( key => prepSource(styleDoc.sources, key, token, finishAll) );
     
   function finishAll(err) {
     if (err) return callback(err);
@@ -1484,13 +1483,13 @@ function prepStyle(err, styleDoc, callback) {
   }
 }
 
-function prepSource(sources, key, callback) {
+function prepSource(sources, key, mbToken, callback) {
   var source = sources[key];
   var url = source.url;
   if (url === undefined) return callback(null); // No change
 
   // Load the referenced TileJSON document
-  url = expandURL(url, mbToken);
+  url = expandTileURL(url, mbToken);
   readJSON(url, merge);
 
   function merge(err, json) {
@@ -1503,7 +1502,14 @@ function prepSource(sources, key, callback) {
   }
 }
 
-function expandURL(url, token) {
+function expandStyleURL(url, token) {
+  var prefix = /^mapbox:\/\/styles\//;
+  if ( !url.match(prefix) ) return url;
+  var apiRoot = "https://api.mapbox.com/styles/v1/";
+  return url.replace(prefix, apiRoot) + "?access_token=" + token;
+}
+
+function expandTileURL(url, token) {
   var prefix = /^mapbox:\/\//;
   if ( !url.match(prefix) ) return url;
   var apiRoot = "https://api.mapbox.com/v4/";
@@ -2637,13 +2643,18 @@ function initRenderer(canvSize, styleLayers) {
   }
 }
 
-function init(canvSize, styleHref, callback) {
-  // TODO: input object with defaults, and Mapbox API token
+function init(params) {
+  // Process parameters, substituting defaults as needed
+  var canvSize = params.size || 512;
+  var styleURL = params.style;   // REQUIRED
+  var mbToken  = params.token;   // May be undefined
+  var callback = params.callback || ( () => undefined );
+
   var styleDoc, tileFactory, renderer;
   var ready = false;
 
   // Get the style info
-  loadStyle(styleHref, setup);
+  loadStyle(styleURL, mbToken, setup);
 
   var api = { create };
 

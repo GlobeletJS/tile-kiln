@@ -2,13 +2,18 @@ import { loadStyle } from "./style.js";
 import { initTileFactory } from "./tile.js";
 import { initRenderer } from "./renderer.js";
 
-export function init(canvSize, styleHref, callback) {
-  // TODO: input object with defaults, and Mapbox API token
+export function init(params) {
+  // Process parameters, substituting defaults as needed
+  var canvSize = params.size || 512;
+  var styleURL = params.style;   // REQUIRED
+  var mbToken  = params.token;   // May be undefined
+  var callback = params.callback || ( () => undefined );
+
   var styleDoc, tileFactory, renderer;
   var ready = false;
 
   // Get the style info
-  loadStyle(styleHref, setup);
+  loadStyle(styleURL, mbToken, setup);
 
   var api = { create };
 
