@@ -15,10 +15,14 @@ export function initTileFactory(size, sources) {
     const tile = {
       z, x, y,
       sources: {},
-      img: new Image(),
       loaded: false,
       rendered: false,
     };
+    // Add a canvas for rendering results
+    tile.img = document.createElement("canvas");
+    tile.img.width = size;
+    tile.img.height = size;
+    tile.ctx = tile.img.getContext("2d");
 
     var numToDo = tileSourceKeys.length;
     tileSourceKeys.forEach( loadTile );

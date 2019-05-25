@@ -25,8 +25,11 @@ export function initRenderer(canvSize, styleLayers) {
   function drawTile(tile, callback = () => undefined) {
     ctx.clearRect(0, 0, canvSize, canvSize);
     styleLayers.forEach( style => drawLayer(style, tile.z, tile.sources) );
-    tile.img.onload = checkImg;
-    tile.img.src = canvas.toDataURL();
+    // Copy the rendered image to the tile
+    //tile.img.onload = checkImg;
+    //tile.img.src = canvas.toDataURL(); // Slow!! >50ms for canvSize = 512
+    tile.ctx.drawImage(canvas, 0, 0); // 5-6ms. why not render to this ctx in the first place?
+    checkImg();
     
     function checkImg() {
       tile.rendered = true;
