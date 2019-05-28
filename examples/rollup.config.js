@@ -18,6 +18,7 @@ export default [{
   plugins: [
     resolve(),
     commonjs(),
+    json(),
   ],
   output: {
     file: 'mvt/main.min.js',

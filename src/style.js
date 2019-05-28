@@ -1,8 +1,13 @@
 import { readJSON } from "./read.js";
 import { derefLayers } from "./deref.js";
 
-export function loadStyle(styleHref, mapboxToken, callback) {
-  var url = expandStyleURL(styleHref, mapboxToken);
+export function loadStyle(style, mapboxToken, callback) {
+  if (typeof style === "object") {
+    // style appears to be parsed JSON already. Prepare it for use
+    return prepStyle(null, style, mapboxToken, callback);
+  }
+  // Style appears to be a URL string. Load the document, then prepare it
+  var url = expandStyleURL(style, mapboxToken);
   var process = (err, doc) => prepStyle(err, doc, mapboxToken, callback);
   return readJSON(url, process);
 }
