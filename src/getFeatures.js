@@ -65,7 +65,7 @@ function prepFilter(filterObj) {
     case "!in" :
       return d => !vals.includes( getVal(d) );
     default:
-      console.log("prepFilter: unknown filter type = " + filterString[0]);
+      console.log("prepFilter: unknown filter type = " + filterObj[0]);
   }
   // No recognizable filter criteria. Return a filter that is always true
   return () => true;

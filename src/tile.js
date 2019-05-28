@@ -8,7 +8,7 @@ export function initTileFactory(size, sources) {
 
   // For now we ignore sources that don't have tile endpoints
   const tileSourceKeys = Object.keys(sources).filter( k => {
-    return sources[k].tiles && sources[k].tiles.length > 1;
+    return sources[k].tiles && sources[k].tiles.length > 0;
   });
 
   function orderTile(z, x, y, callback = () => true) {
