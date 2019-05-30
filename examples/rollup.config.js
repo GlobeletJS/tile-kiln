@@ -25,4 +25,16 @@ export default [{
     format: 'iife',
     name: 'mvt',
   },
+}, {
+  input: 'dynamic/main.js',
+  plugins: [
+    resolve(),
+    commonjs(),
+    json(),
+  ],
+  output: {
+    file: 'dynamic/main.min.js',
+    format: 'iife',
+    name: 'dynamic',
+  },
 }];

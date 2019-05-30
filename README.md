@@ -2,7 +2,10 @@
 Inputs map data (both raster and vector) and renders it into tiles.
 Styling is guided by a document following the [Mapbox style specification].
 
+Check the simple [single-tile example] with dynamic style changes.
+
 [Mapbox style specification]: https://docs.mapbox.com/mapbox-gl-js/style-spec/
+[single-tile example]: https://jjhembd.github.io/tilekiln/examples/dynamic/index.html
 
 ## Initialization
 tilekiln.init takes a parameter object with the following properties:
