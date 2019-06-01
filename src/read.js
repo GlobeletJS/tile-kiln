@@ -15,8 +15,8 @@ export function readMVT(dataHref, size, callback) {
     }
     if (this.status === 404) {
       // TODO: is there a better way to handle this?
-      console.log("ERROR in readMVT: could not load " + this.src);
-      return callback(null, null);
+      console.log("ERROR in readMVT: could not load " + dataHref);
+      return callback(null, {});
     }
 
     //console.time('parseMVT');
