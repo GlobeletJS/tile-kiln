@@ -3,6 +3,8 @@ import { parseCSSColor } from 'csscolorparser';
 export function evalStyle(styleFunction, zoom) {
   // Quick exit if styleFunction is a constant or undefined
   if (typeof styleFunction !== "object") return styleFunction;
+  // Exit if we have an array (e.g., for text-font)
+  if (Array.isArray(styleFunction)) return styleFunction;
 
   const stops = styleFunction.stops;
   if (!stops || stops.length < 2 || stops[0].length !== 2) {
@@ -14,7 +16,8 @@ export function evalStyle(styleFunction, zoom) {
   // Find which stops the current zoom level falls between
   var numStops = stops.length;
   var iz = 0;
-  while (iz < numStops && zoom > stops[iz][0]) iz++;
+  //while (iz < numStops && zoom > stops[iz][0]) iz++;
+  while (iz < numStops && zoom >= stops[iz][0]) iz++;
 
   // Quick exit if we are outside the stops
   if (iz === 0) return stops[0][1];

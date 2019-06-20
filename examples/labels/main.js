@@ -3,7 +3,7 @@
 import { initDisplay } from "./display.js";
 import * as tilekiln from "../../dist/tilekiln.bundle.js";
 
-const tzxy = [11, 447, 831];
+const tzxy = [7, 29, 53];
 
 export function main() {
   // Initialize the display canvas and rendering context
@@ -12,13 +12,16 @@ export function main() {
   // Initialize tile factory
   const tileMaker = tilekiln.init({
     size: 512,
-    style: "./wells_style.json", //"mapbox://styles/mapbox/streets-v8",
+    style: "mapbox://styles/mapbox/streets-v8",
     token: "pk.eyJ1IjoiamhlbWJkIiwiYSI6ImNqcHpueHpyZjBlMjAzeG9kNG9oNzI2NTYifQ.K7fqhk2Z2YZ8NIV94M-5nA", 
     callback: setup,
   });
 
   // Get a link to the tile coordinates printout
   var title = document.getElementById("zxy");
+  // Get a link to the source data printout
+  var info = document.getElementById("info");
+
   var linesVisible = true;
   var hillshadeVisible = true;
   var currentTile;
@@ -38,6 +41,7 @@ export function main() {
     // Copy the renderer canvas onto our display canvas
     dctx.drawImage(tile.img, 0, 0);
     title.innerHTML = "z/x/y = " + tzxy[0] + "/" + tzxy[1] + "/" + tzxy[2];
+    //info.innerHTML = "<pre>" + JSON.stringify(tile.sources.composite, null, 2) + "</pre>";
   }
 
   function toggleLines() {

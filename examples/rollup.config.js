@@ -37,4 +37,16 @@ export default [{
     format: 'iife',
     name: 'dynamic',
   },
+}, {
+  input: 'labels/main.js',
+  plugins: [
+    resolve(),
+    commonjs(),
+    json(),
+  ],
+  output: {
+    file: 'labels/main.min.js',
+    format: 'iife',
+    name: 'labels',
+  },
 }];

@@ -1,5 +1,6 @@
 import * as d3 from 'd3-geo';
 import { evalStyle } from "./styleFunction.js";
+import { renderText } from "./symbols.js";
 
 export function initPainter(ctx) {
   // Input ctx is a Canvas 2D rendering context
@@ -50,6 +51,8 @@ export function initPainter(ctx) {
         renderFill(style, zoom, mapData);
         break;
       case "symbol":  // Labels
+        renderText(ctx, style, zoom, mapData);
+        break;
       default :
         //console.log("ERROR in drawMVT: layer.type = " + style.type +
         //    " not supported!");
@@ -97,10 +100,16 @@ export function initPainter(ctx) {
     ctx.fill();
   }
 
+  function drawLabel(field, feature) {
+    var coords = feature.geometry.coordinates;
+    ctx.strokeText(feature.properties[field], coords[0], coords[1]);
+    ctx.fillText(feature.properties[field], coords[0], coords[1]);
+  }
+
   function setStyle(option, val, zoom) { // Nested for access to ctx
     var calcVal = evalStyle(val, zoom);
     // If val was not set, return without updating state
-    // TODO: is this necessary? Canvas 2D already doesn't apply invalid values
+    // TODO: is this necessary? Canvas 2D already doesn't apply undefined values
     if (calcVal === undefined) return;
 
     ctx[option] = calcVal;
