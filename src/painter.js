@@ -1,6 +1,6 @@
 import * as d3 from 'd3-geo';
 import { evalStyle } from "./styleFunction.js";
-import { renderText } from "./symbols.js";
+import { renderSymbols } from "./symbols.js";
 
 export function initPainter(ctx) {
   // Input ctx is a Canvas 2D rendering context
@@ -36,7 +36,7 @@ export function initPainter(ctx) {
     return;
   }
 
-  function drawJSON(style, zoom, mapData) {
+  function drawJSON(style, zoom, mapData, sprite) {
     // Input style is ONE layer from a Mapbox style document
     // Input mapData is a GeoJSON "FeatureCollection" 
 
@@ -51,7 +51,7 @@ export function initPainter(ctx) {
         renderFill(style, zoom, mapData);
         break;
       case "symbol":  // Labels
-        renderText(ctx, style, zoom, mapData);
+        renderSymbols(ctx, style, zoom, mapData, sprite);
         break;
       default :
         //console.log("ERROR in drawMVT: layer.type = " + style.type +
@@ -98,12 +98,6 @@ export function initPainter(ctx) {
     //  fill-pattern
     path(data);
     ctx.fill();
-  }
-
-  function drawLabel(field, feature) {
-    var coords = feature.geometry.coordinates;
-    ctx.strokeText(feature.properties[field], coords[0], coords[1]);
-    ctx.fillText(feature.properties[field], coords[0], coords[1]);
   }
 
   function setStyle(option, val, zoom) { // Nested for access to ctx

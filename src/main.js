@@ -27,7 +27,7 @@ export function init(params) {
   function setup(err, styleDoc) {
     if (err) callback(err);
     tileFactory = initTileFactory(canvSize, styleDoc.sources);
-    renderer = initRenderer(canvSize, styleDoc.layers);
+    renderer = initRenderer(canvSize, styleDoc.layers, styleDoc.sprite);
 
     // Update api
     api.style = styleDoc;

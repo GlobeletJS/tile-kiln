@@ -1,4 +1,4 @@
-import { readJSON } from "./read.js";
+import { readJSON, loadImage } from "./read.js";
 import { derefLayers } from "./deref.js";
 
 export function loadStyle(style, mapboxToken, callback) {
@@ -19,8 +19,37 @@ export function prepStyle(err, styleDoc, token, callback) {
   // Prepare the "sources" object
   var sKeys = Object.keys(styleDoc.sources);
   var numToDo = sKeys.length;
+
+  // Add "sprite" object if needed
+  if (styleDoc.sprite) {
+    numToDo += 2;
+    var spriteURLs = expandSpriteURLs(styleDoc.sprite, token);
+    // We will replace the .sprite URL with an object containing
+    // image and metadata
+    styleDoc.sprite = {};
+    // Retrieve both .json and .png files
+    loadImage(spriteURLs.image, prepSpriteImage);
+    readJSON(spriteURLs.meta, prepSpriteMeta);
+  }
+
   sKeys.forEach( key => prepSource(styleDoc.sources, key, token, finishAll) );
     
+  function prepSpriteImage(err, png) {
+    if (err) finishAll(err);
+    styleDoc.sprite.image = png;
+    finishAll(null);
+  }
+
+  function prepSpriteMeta(err, json) {
+    if (err) finishAll(err);
+    styleDoc.sprite.meta = json;
+
+    console.log("prepSpriteMeta: sprite metadata:");
+    console.log(JSON.stringify(json, null, 2));
+
+    finishAll(null);
+  }
+
   function finishAll(err) {
     if (err) return callback(err);
     if (--numToDo == 0) callback(null, styleDoc);
@@ -51,6 +80,24 @@ function expandStyleURL(url, token) {
   if ( !url.match(prefix) ) return url;
   var apiRoot = "https://api.mapbox.com/styles/v1/";
   return url.replace(prefix, apiRoot) + "?access_token=" + token;
+}
+
+function expandSpriteURLs(url, token) {
+  // Returns an array containing urls to .png and .json files
+  var prefix = /^mapbox:\/\/sprites\//;
+  if ( !url.match(prefix) ) return {
+    image: url + ".png", 
+    meta: url + ".json",
+  };
+
+  // We have a Mapbox custom url. Expand to an absolute URL, as per the spec
+  var apiRoot = "https://api.mapbox.com/styles/v1/";
+  url = url.replace(prefix, apiRoot) + "/sprite";
+  var tokenString = "?access_token=" + token;
+  return {
+    image: url + ".png" + tokenString, 
+    meta: url + ".json" + tokenString,
+  };
 }
 
 function expandTileURL(url, token) {

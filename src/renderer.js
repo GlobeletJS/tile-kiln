@@ -1,9 +1,10 @@
 import { getFeatures } from "./getFeatures.js";
 import { initPainter } from "./painter.js";
 
-export function initRenderer(canvSize, styleLayers) {
+export function initRenderer(canvSize, styleLayers, sprite) {
   // Input styleLayers points to the .layers property of a Mapbox style document
   // Specification: https://docs.mapbox.com/mapbox-gl-js/style-spec/
+  // Input sprite (if defined) is an object with image and meta properties
 
   // Create canvas for rendering, set drawingbuffer size
   const canvas = document.createElement("canvas");
@@ -57,6 +58,6 @@ export function initRenderer(canvSize, styleLayers) {
     var mapLayer = source[ style["source-layer"] ];
     var mapData = getFeatures(mapLayer, style.filter);
     if (!mapData) return;
-    return painter.drawJSON(style, zoom, mapData);
+    return painter.drawJSON(style, zoom, mapData, sprite);
   }
 }

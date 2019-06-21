@@ -1,6 +1,7 @@
 import { evalStyle } from "./styleFunction.js";
+import { getTokenParser } from "./tokens.js";
 
-export function renderText(ctx, style, zoom, data) {
+export function renderSymbols(ctx, style, zoom, data, sprite) {
   var layout = style.layout;
   if (layout["symbol-placement"] === "line") return;
   var field = evalStyle(layout["text-field"], zoom);
@@ -42,6 +43,82 @@ export function renderText(ctx, style, zoom, data) {
 
   // Set text-anchor
   var anchor = evalStyle(layout["text-anchor"], zoom);
+  setAnchor(ctx, anchor);
+
+  // Get the text-offset
+  var offset = evalStyle(layout["text-offset"], zoom) || [0, 0];
+
+  // Setup the text transform function
+  var transformCode = evalStyle(layout["text-transform"], zoom);
+  var transform = constructTextTransform(transformCode);
+
+  // Get sprite metadata
+  var spriteName = evalStyle(layout["icon-image"], zoom);
+  var iconParser;
+  if (spriteName) {
+    console.log("renderText: layer, icon-image: " + 
+      style.id + ", " + spriteName);
+    iconParser = getTokenParser(spriteName);
+  }
+
+  // Set text color and halo properties
+  var paint = style.paint;
+  ctx.fillStyle   = evalStyle(paint["text-color"], zoom);
+  ctx.strokeStyle = evalStyle(paint["text-halo-color"], zoom);
+  var haloWidth   = evalStyle(paint["text-halo-width"], zoom) || 0;
+  if (haloWidth > 0) ctx.lineWidth = haloWidth * 2.0;
+
+  // Now render all the specified labels
+  data.features.forEach(drawLabel);
+
+  function drawLabel(feature) { 
+    // Nested for access to ctx, field, offset, fontSize, transform, haloWidth
+    var labelText = feature.properties[field];
+    if (!labelText) {
+      console.log("drawLabel: No text in " + field + "!");
+      console.log(JSON.stringify(feature));
+      return;
+    }
+    labelText = transform(labelText);
+
+    var coords = feature.geometry.coordinates;
+    var x = coords[0] + offset[0] * fontSize;
+    var y = coords[1] + offset[1] * fontSize;
+
+    if (spriteName) {
+      var spriteID = iconParser(feature.properties);
+      var spriteMeta = sprite.meta[spriteID];
+      ctx.drawImage(
+          sprite.image,
+          spriteMeta.x,
+          spriteMeta.y,
+          spriteMeta.width,
+          spriteMeta.height,
+          coords[0] - spriteMeta.width / 2,
+          coords[1] - spriteMeta.height / 2,
+          spriteMeta.width,
+          spriteMeta.height
+          );
+    }
+
+    if (haloWidth > 0) ctx.strokeText(labelText, x, y);
+    ctx.fillText(labelText, x, y);
+  }
+}
+
+function constructTextTransform(code) {
+  switch (code) {
+    case "uppercase":
+      return f => f.toUpperCase();
+    case "lowercase":
+      return f => f.toLowerCase();
+    case "none":
+    default:
+      return f => f;
+  }
+}
+
+function setAnchor(ctx, anchor) {
   switch (anchor) {
     case "top-left":
       ctx.textBaseline = "top";
@@ -80,51 +157,5 @@ export function renderText(ctx, style, zoom, data) {
       ctx.textBaseline = "middle";
       ctx.textAlign = "center";
   }
-
-  // Get the text-offset
-  var offset = evalStyle(layout["text-offset"], zoom) || [0, 0];
-
-  // Setup the text transform function
-  var transformCode = evalStyle(layout["text-transform"], zoom);
-  var transform = constructTextTransform(transformCode);
-
-  // Set text color and halo properties
-  var paint = style.paint;
-  ctx.fillStyle   = evalStyle(paint["text-color"], zoom);
-  ctx.strokeStyle = evalStyle(paint["text-halo-color"], zoom);
-  var haloWidth   = evalStyle(paint["text-halo-width"], zoom) || 0;
-  if (haloWidth > 0) ctx.lineWidth = haloWidth * 2.0;
-
-  // Now render all the specified labels
-  data.features.forEach(drawLabel);
-
-  function drawLabel(feature) { 
-    // Nested for access to ctx, field, offset, fontSize, transform, haloWidth
-    var labelText = feature.properties[field];
-    if (!labelText) {
-      console.log("drawLabel: No text in " + field + "!");
-      console.log(JSON.stringify(feature));
-      return;
-    }
-    labelText = transform(labelText);
-
-    var coords = feature.geometry.coordinates;
-    var x = coords[0] + offset[0] * fontSize;
-    var y = coords[1] + offset[1] * fontSize;
-
-    if (haloWidth > 0) ctx.strokeText(labelText, x, y);
-    ctx.fillText(labelText, x, y);
-  }
-}
-
-function constructTextTransform(code) {
-  switch (code) {
-    case "uppercase":
-      return f => f.toUpperCase();
-    case "lowercase":
-      return f => f.toLowerCase();
-    case "none":
-    default:
-      return f => f;
-  }
+  return;
 }
