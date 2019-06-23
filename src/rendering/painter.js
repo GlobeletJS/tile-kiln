@@ -1,6 +1,5 @@
 import * as d3 from 'd3-geo';
 import { evalStyle } from "./styleFunction.js";
-import { renderSymbols } from "./symbols.js";
 
 export function initPainter(ctx) {
   // Input ctx is a Canvas 2D rendering context
@@ -13,7 +12,9 @@ export function initPainter(ctx) {
   return {
     fillBackground,
     drawRaster,
-    drawJSON,
+    drawCircles,
+    drawLines,
+    drawFills,
   };
 
   function fillBackground(style, zoom) {
@@ -36,31 +37,7 @@ export function initPainter(ctx) {
     return;
   }
 
-  function drawJSON(style, zoom, mapData, sprite) {
-    // Input style is ONE layer from a Mapbox style document
-    // Input mapData is a GeoJSON "FeatureCollection" 
-
-    switch (style.type) {
-      case "circle":  // Point or MultiPoint geometry
-        renderCircle(style, zoom, mapData);
-        break;
-      case "line":    // LineString, MultiLineString, Polygon, or MultiPolygon
-        renderLine(style, zoom, mapData);
-        break;
-      case "fill":    // Polygon or MultiPolygon (maybe also linestrings?)
-        renderFill(style, zoom, mapData);
-        break;
-      case "symbol":  // Labels
-        renderSymbols(ctx, style, zoom, mapData, sprite);
-        break;
-      default :
-        //console.log("ERROR in drawMVT: layer.type = " + style.type +
-        //    " not supported!");
-    }
-    return;
-  }
-
-  function renderCircle(style, zoom, data) {
+  function drawCircles(style, zoom, data) {
     ctx.beginPath();
     var paint = style.paint;
     if (paint["circle-radius"]) {
@@ -75,7 +52,7 @@ export function initPainter(ctx) {
     ctx.fill();
   }
 
-  function renderLine(style, zoom, data) {
+  function drawLines(style, zoom, data) {
     ctx.beginPath();
     setStyle("lineCap", style.layout["line-cap"], zoom);
     setStyle("lineJoin", style.layout["line-join"], zoom);
@@ -90,7 +67,7 @@ export function initPainter(ctx) {
     ctx.stroke();
   }
 
-  function renderFill(style, zoom, data) {
+  function drawFills(style, zoom, data) {
     ctx.beginPath();
     setStyle("fillStyle", style.paint["fill-color"], zoom);
     setStyle("globalAlpha", style.paint["fill-opacity"], zoom);

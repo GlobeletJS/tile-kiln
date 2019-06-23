@@ -43,10 +43,6 @@ export function prepStyle(err, styleDoc, token, callback) {
   function prepSpriteMeta(err, json) {
     if (err) finishAll(err);
     styleDoc.sprite.meta = json;
-
-    console.log("prepSpriteMeta: sprite metadata:");
-    console.log(JSON.stringify(json, null, 2));
-
     finishAll(null);
   }
 

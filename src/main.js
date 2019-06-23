@@ -1,6 +1,6 @@
 import { loadStyle } from "./style.js";
 import { initTileFactory } from "./tile.js";
-import { initRenderer } from "./renderer.js";
+import { initRenderer } from "./rendering/renderer.js";
 
 export function init(params) {
   // Process parameters, substituting defaults as needed
