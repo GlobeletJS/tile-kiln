@@ -2677,8 +2677,8 @@ function getFontString(fontSize, fontFace) {
   }
 
   return (fontStyle)
-    ? fontStyle + " " + fontSize + "px sans-serif"
-    : fontSize + "px sans-serif";
+    ? fontStyle + " " + fontSize + 'px "PT Sans", sans-serif'
+    : fontSize + 'px "PT Sans", sans-serif';
 }
 
 function initTextLabeler(ctx, style, zoom) {
@@ -2694,15 +2694,18 @@ function initTextLabeler(ctx, style, zoom) {
   var fontFace = evalStyle(layout["text-font"], zoom);
   ctx.font = getFontString(fontSize, fontFace);
 
-  //console.log("renderText: layer, field, fontString = " +
-  //    style.id + ", " + field + ", " + fontString);
+  // Get some basic style parameters
+  let lineHeight = evalStyle(layout["text-line-height"], zoom) || 1.2;
+  let textPadding = evalStyle(layout["text-padding"], zoom) || 2.0;
+  let textOffset = evalStyle(layout["text-offset"], zoom) || [0, 0];
+
+  // Variables to store label info between measure and draw calls
+  var posShift = [0, 0];
+  var labelText, labelLength, labelHeight, x, y;
 
   // Set text-anchor
   var anchor = evalStyle(layout["text-anchor"], zoom);
-  setAnchor(ctx, anchor);
-
-  // Get the text-offset
-  var offset = evalStyle(layout["text-offset"], zoom) || [0, 0];
+  setAnchor(anchor);
 
   // Setup the text transform function
   var transformCode = evalStyle(layout["text-transform"], zoom);
@@ -2713,28 +2716,89 @@ function initTextLabeler(ctx, style, zoom) {
   ctx.fillStyle   = evalStyle(paint["text-color"], zoom);
   ctx.strokeStyle = evalStyle(paint["text-halo-color"], zoom);
   var haloWidth   = evalStyle(paint["text-halo-width"], zoom) || 0;
-  if (haloWidth > 0) ctx.lineWidth = haloWidth * 2.0;
+  if (haloWidth > 0) {
+    ctx.lineWidth = haloWidth * 2.0;
+    ctx.lineJoin = "round";
+  }
 
   return {
-    //measure,
+    measure,
     draw,
   };
 
-  function draw(feature) { 
-    var labelText = feature.properties[field];
-    if (!labelText) {
-      console.log("drawLabel: No text in " + field + "!");
-      console.log(JSON.stringify(feature));
-      return;
-    }
+  function measure(feature) {
+    labelText = feature.properties[field];
+    if (!labelText) return;
+
     labelText = transform(labelText);
+    labelLength = ctx.measureText(labelText).width;
+    labelHeight = fontSize * lineHeight;
 
     var coords = feature.geometry.coordinates;
-    var x = coords[0] + offset[0] * fontSize;
-    var y = coords[1] + offset[1] * fontSize;
+    // Compute coordinates of bottom left corner of text
+    x = coords[0] + textOffset[0] * fontSize + posShift[0] * labelLength;
+    y = coords[1] + textOffset[1] * labelHeight + posShift[1] * labelHeight;
+
+    // Return a bounding box object
+    return [
+      [x - textPadding, y - labelHeight - textPadding],
+      [x + labelLength + textPadding, y + textPadding]
+    ];
+  }
+
+  function draw() {
+    if (!labelText) return;
 
     if (haloWidth > 0) ctx.strokeText(labelText, x, y);
     ctx.fillText(labelText, x, y);
+  }
+
+  function setAnchor(anchor) {
+    // Set baseline
+    ctx.textBaseline = "bottom";
+    switch (anchor) {
+      case "top-left":
+      case "top-right":
+      case "top":
+        //ctx.textBaseline = "top";
+        posShift[1] = 1.0;
+        break;
+      case "bottom-left":
+      case "bottom-right":
+      case "bottom":
+        posShift[1] = 0.0;
+        //ctx.textBaseline = "bottom";
+        break;
+      case "left":
+      case "right":
+      case "center":
+      default:
+        //ctx.textBaseline = "middle";
+        posShift[1] = 0.5;
+    }
+    // Set textAlign
+    ctx.textAlign = "left";
+    switch (anchor) {
+      case "top-left":
+      case "bottom-left":
+      case "left":
+        //ctx.textAlign = "left";
+        posShift[0] = 0.0;
+        break;
+      case "top-right":
+      case "bottom-right":
+      case "right":
+        //ctx.textAlign = "right";
+        posShift[0] = -1.0;
+        break;
+      case "top":
+      case "bottom":
+      case "center":
+      default:
+        //ctx.textAlign = "center";
+        posShift[0] = -0.5;
+    }
+    return;
   }
 }
 
@@ -2750,79 +2814,48 @@ function constructTextTransform(code) {
   }
 }
 
-function setAnchor(ctx, anchor) {
-  switch (anchor) {
-    case "top-left":
-      ctx.textBaseline = "top";
-      ctx.textAlign = "left";
-      break;
-    case "top-right":
-      ctx.textBaseline = "top";
-      ctx.textAlign = "right";
-      break;
-    case "top":
-      ctx.textBaseline = "top";
-      ctx.textAlign = "center";
-      break;
-    case "bottom-left":
-      ctx.textBaseline = "bottom";
-      ctx.textAlign = "left";
-      break;
-    case "bottom-right":
-      ctx.textBaseline = "bottom";
-      ctx.textAlign = "right";
-      break;
-    case "bottom":
-      ctx.textBaseline = "bottom";
-      ctx.textAlign = "center";
-      break;
-    case "left":
-      ctx.textBaseline = "middle";
-      ctx.textAlign = "left";
-      break;
-    case "right":
-      ctx.textBaseline = "middle";
-      ctx.textAlign = "right";
-      break;
-    case "center":
-    default:
-      ctx.textBaseline = "middle";
-      ctx.textAlign = "center";
-  }
-  return;
-}
-
 function initIconLabeler(ctx, style, zoom, sprite) {
   var layout = style.layout;
+  var iconParser, spriteMeta, x, y;
 
   // Get sprite metadata
   var spriteName = evalStyle(layout["icon-image"], zoom);
-  var iconParser;
-  if (spriteName) {
-    console.log("renderText: layer, icon-image: " + 
-        style.id + ", " + spriteName);
-    iconParser = getTokenParser(spriteName);
-  }
+  if (spriteName) iconParser = getTokenParser(spriteName);
+
+  var iconPadding = evalStyle(layout["icon-padding"], zoom) || 2;
 
   return {
-    //measure,
+    measure,
     draw,
   };
 
-  function draw(feature) {
+  function measure(feature) {
     if (!spriteName) return;
-    var coords = feature.geometry.coordinates;
 
     var spriteID = iconParser(feature.properties);
-    var spriteMeta = sprite.meta[spriteID];
+    spriteMeta = sprite.meta[spriteID];
+
+    var coords = feature.geometry.coordinates;
+    x = coords[0] - spriteMeta.width / 2;
+    y = coords[1] - spriteMeta.height / 2;
+
+    return [
+      [x - iconPadding, y - iconPadding],
+      [x + spriteMeta.width + iconPadding, y + spriteMeta.height + iconPadding]
+    ];
+  } 
+
+  function draw() {
+    if (!spriteName) return;
+
     ctx.drawImage(
         sprite.image,
         spriteMeta.x,
         spriteMeta.y,
         spriteMeta.width,
         spriteMeta.height,
-        coords[0] - spriteMeta.width / 2,
-        coords[1] - spriteMeta.height / 2,
+        x,
+        y,
         spriteMeta.width,
         spriteMeta.height
         );
@@ -2830,6 +2863,7 @@ function initIconLabeler(ctx, style, zoom, sprite) {
 }
 
 function initLabeler(ctx, sprite) {
+  var boxes = [];
 
   return {
     clearBoxes,
@@ -2837,6 +2871,7 @@ function initLabeler(ctx, sprite) {
   };
 
   function clearBoxes() {
+    boxes = [];
   }
 
   function draw(style, zoom, data) {
@@ -2846,18 +2881,39 @@ function initLabeler(ctx, sprite) {
     const textLabeler = initTextLabeler(ctx, style, zoom);
     const iconLabeler = initIconLabeler(ctx, style, zoom, sprite);
 
-    // Now render all the specified labels
     data.features.forEach(drawLabel);
 
     function drawLabel(feature) {
-      // TODO: check for collisions...
+      var textBox = textLabeler.measure(feature);
+      if ( collides(textBox) ) return;
+
+      var iconBox = iconLabeler.measure(feature);
+      if ( collides(iconBox) ) return;
+
+      if (textBox) boxes.push(textBox);
+      if (iconBox) boxes.push(iconBox);
 
       // Draw the labels
-      iconLabeler.draw(feature);
-      textLabeler.draw(feature);
+      iconLabeler.draw();
+      textLabeler.draw();
       return;
     }
   }
+
+  function collides(newBox) {
+    if (!newBox) return false;
+    return boxes.some( box => intersects(box, newBox) );
+  }
+}
+
+function intersects(box1, box2) {
+  // box[0] = [xmin, ymin]; box[1] = [xmax, ymax]
+  if (box1[0][0] > box2[1][0]) return false;
+  if (box2[0][0] > box1[1][0]) return false;
+  if (box1[0][1] > box2[1][1]) return false;
+  if (box2[0][1] > box1[1][1]) return false;
+
+  return true;
 }
 
 function initRenderer(canvSize, styleLayers, sprite) {

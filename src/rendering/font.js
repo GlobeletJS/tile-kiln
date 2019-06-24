@@ -17,6 +17,6 @@ export function getFontString(fontSize, fontFace) {
   }
 
   return (fontStyle)
-    ? fontStyle + " " + fontSize + "px sans-serif"
-    : fontSize + "px sans-serif";
+    ? fontStyle + " " + fontSize + 'px "PT Sans", sans-serif'
+    : fontSize + 'px "PT Sans", sans-serif';
 }

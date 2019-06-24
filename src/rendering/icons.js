@@ -3,35 +3,46 @@ import { getTokenParser } from "./tokens.js";
 
 export function initIconLabeler(ctx, style, zoom, sprite) {
   var layout = style.layout;
+  var iconParser, spriteMeta, x, y;
 
   // Get sprite metadata
   var spriteName = evalStyle(layout["icon-image"], zoom);
-  var iconParser;
-  if (spriteName) {
-    console.log("renderText: layer, icon-image: " + 
-        style.id + ", " + spriteName);
-    iconParser = getTokenParser(spriteName);
-  }
+  if (spriteName) iconParser = getTokenParser(spriteName);
+
+  var iconPadding = evalStyle(layout["icon-padding"], zoom) || 2;
 
   return {
-    //measure,
+    measure,
     draw,
   };
 
-  function draw(feature) {
+  function measure(feature) {
     if (!spriteName) return;
-    var coords = feature.geometry.coordinates;
 
     var spriteID = iconParser(feature.properties);
-    var spriteMeta = sprite.meta[spriteID];
+    spriteMeta = sprite.meta[spriteID];
+
+    var coords = feature.geometry.coordinates;
+    x = coords[0] - spriteMeta.width / 2;
+    y = coords[1] - spriteMeta.height / 2;
+
+    return [
+      [x - iconPadding, y - iconPadding],
+      [x + spriteMeta.width + iconPadding, y + spriteMeta.height + iconPadding]
+    ];
+  } 
+
+  function draw() {
+    if (!spriteName) return;
+
     ctx.drawImage(
         sprite.image,
         spriteMeta.x,
         spriteMeta.y,
         spriteMeta.width,
         spriteMeta.height,
-        coords[0] - spriteMeta.width / 2,
-        coords[1] - spriteMeta.height / 2,
+        x,
+        y,
         spriteMeta.width,
         spriteMeta.height
         );
