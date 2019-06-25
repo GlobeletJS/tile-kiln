@@ -2836,8 +2836,8 @@ function initIconLabeler(ctx, style, zoom, sprite) {
     spriteMeta = sprite.meta[spriteID];
 
     var coords = feature.geometry.coordinates;
-    x = coords[0] - spriteMeta.width / 2;
-    y = coords[1] - spriteMeta.height / 2;
+    x = Math.round(coords[0] - spriteMeta.width / 2);
+    y = Math.round(coords[1] - spriteMeta.height / 2);
 
     return [
       [x - iconPadding, y - iconPadding],
