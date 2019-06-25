@@ -1,4 +1,5 @@
 export function getTokenParser(tokenText) {
+  if (!tokenText) return () => undefined;
   const tokenPattern = /{([^{}]+)}/g;
 
   // We break tokenText into pieces that are either plain text or tokens,

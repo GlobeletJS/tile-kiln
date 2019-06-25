@@ -3,11 +3,11 @@ import { getTokenParser } from "./tokens.js";
 
 export function initIconLabeler(ctx, style, zoom, sprite) {
   var layout = style.layout;
-  var iconParser, spriteMeta, x, y;
+  var spriteID, spriteMeta, x, y;
 
   // Get sprite metadata
   var spriteName = evalStyle(layout["icon-image"], zoom);
-  if (spriteName) iconParser = getTokenParser(spriteName);
+  var iconParser = getTokenParser(spriteName);
 
   var iconPadding = evalStyle(layout["icon-padding"], zoom) || 2;
 
@@ -17,9 +17,9 @@ export function initIconLabeler(ctx, style, zoom, sprite) {
   };
 
   function measure(feature) {
-    if (!spriteName) return;
+    spriteID = iconParser(feature.properties);
+    if (!spriteID) return;
 
-    var spriteID = iconParser(feature.properties);
     spriteMeta = sprite.meta[spriteID];
 
     var coords = feature.geometry.coordinates;
@@ -33,7 +33,7 @@ export function initIconLabeler(ctx, style, zoom, sprite) {
   } 
 
   function draw() {
-    if (!spriteName) return;
+    if (!spriteID) return;
 
     ctx.drawImage(
         sprite.image,

@@ -2619,6 +2619,7 @@ function initPainter(ctx) {
 }
 
 function getTokenParser(tokenText) {
+  if (!tokenText) return () => undefined;
   const tokenPattern = /{([^{}]+)}/g;
 
   // We break tokenText into pieces that are either plain text or tokens,
@@ -2682,12 +2683,12 @@ function getFontString(fontSize, fontFace) {
 }
 
 function initTextLabeler(ctx, style, zoom) {
+  var labelText, labelLength, labelHeight, x, y;
+  var posShift = [0, 0];
   var layout = style.layout;
-  var field = evalStyle(layout["text-field"], zoom);
 
-  // TODO: allow tokens in field
-  if (!field || typeof field !== "string") return;
-  field = field.replace(/[{}]/g, "");
+  var textField = evalStyle(layout["text-field"], zoom);
+  var textParser = getTokenParser(textField);
 
   // Construct the ctx.font string from text-size and text-font
   var fontSize = evalStyle(layout["text-size"], zoom) || 16;
@@ -2698,10 +2699,6 @@ function initTextLabeler(ctx, style, zoom) {
   let lineHeight = evalStyle(layout["text-line-height"], zoom) || 1.2;
   let textPadding = evalStyle(layout["text-padding"], zoom) || 2.0;
   let textOffset = evalStyle(layout["text-offset"], zoom) || [0, 0];
-
-  // Variables to store label info between measure and draw calls
-  var posShift = [0, 0];
-  var labelText, labelLength, labelHeight, x, y;
 
   // Set text-anchor
   var anchor = evalStyle(layout["text-anchor"], zoom);
@@ -2727,7 +2724,7 @@ function initTextLabeler(ctx, style, zoom) {
   };
 
   function measure(feature) {
-    labelText = feature.properties[field];
+    labelText = textParser(feature.properties);
     if (!labelText) return;
 
     labelText = transform(labelText);
@@ -2754,7 +2751,8 @@ function initTextLabeler(ctx, style, zoom) {
   }
 
   function setAnchor(anchor) {
-    // Set baseline
+    // Set baseline. We let Canvas2D use textBaseline = "bottom", and use
+    // posShift to shift the text box for other requested baselines
     ctx.textBaseline = "bottom";
     switch (anchor) {
       case "top-left":
@@ -2776,7 +2774,8 @@ function initTextLabeler(ctx, style, zoom) {
         //ctx.textBaseline = "middle";
         posShift[1] = 0.5;
     }
-    // Set textAlign
+    // Set textAlign. We let Canvas2D use textAlign = "left", and use
+    // posShift to shift the text box for other requested alignments
     ctx.textAlign = "left";
     switch (anchor) {
       case "top-left":
@@ -2816,11 +2815,11 @@ function constructTextTransform(code) {
 
 function initIconLabeler(ctx, style, zoom, sprite) {
   var layout = style.layout;
-  var iconParser, spriteMeta, x, y;
+  var spriteID, spriteMeta, x, y;
 
   // Get sprite metadata
   var spriteName = evalStyle(layout["icon-image"], zoom);
-  if (spriteName) iconParser = getTokenParser(spriteName);
+  var iconParser = getTokenParser(spriteName);
 
   var iconPadding = evalStyle(layout["icon-padding"], zoom) || 2;
 
@@ -2830,9 +2829,9 @@ function initIconLabeler(ctx, style, zoom, sprite) {
   };
 
   function measure(feature) {
-    if (!spriteName) return;
+    spriteID = iconParser(feature.properties);
+    if (!spriteID) return;
 
-    var spriteID = iconParser(feature.properties);
     spriteMeta = sprite.meta[spriteID];
 
     var coords = feature.geometry.coordinates;
@@ -2846,7 +2845,7 @@ function initIconLabeler(ctx, style, zoom, sprite) {
   } 
 
   function draw() {
-    if (!spriteName) return;
+    if (!spriteID) return;
 
     ctx.drawImage(
         sprite.image,

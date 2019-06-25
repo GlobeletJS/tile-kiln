@@ -3,12 +3,12 @@ import { getTokenParser } from "./tokens.js";
 import { getFontString } from "./font.js";
 
 export function initTextLabeler(ctx, style, zoom) {
+  var labelText, labelLength, labelHeight, x, y;
+  var posShift = [0, 0];
   var layout = style.layout;
-  var field = evalStyle(layout["text-field"], zoom);
 
-  // TODO: allow tokens in field
-  if (!field || typeof field !== "string") return;
-  field = field.replace(/[{}]/g, "");
+  var textField = evalStyle(layout["text-field"], zoom);
+  var textParser = getTokenParser(textField);
 
   // Construct the ctx.font string from text-size and text-font
   var fontSize = evalStyle(layout["text-size"], zoom) || 16;
@@ -19,10 +19,6 @@ export function initTextLabeler(ctx, style, zoom) {
   let lineHeight = evalStyle(layout["text-line-height"], zoom) || 1.2;
   let textPadding = evalStyle(layout["text-padding"], zoom) || 2.0;
   let textOffset = evalStyle(layout["text-offset"], zoom) || [0, 0];
-
-  // Variables to store label info between measure and draw calls
-  var posShift = [0, 0];
-  var labelText, labelLength, labelHeight, x, y;
 
   // Set text-anchor
   var anchor = evalStyle(layout["text-anchor"], zoom);
@@ -48,7 +44,7 @@ export function initTextLabeler(ctx, style, zoom) {
   };
 
   function measure(feature) {
-    labelText = feature.properties[field];
+    labelText = textParser(feature.properties);
     if (!labelText) return;
 
     labelText = transform(labelText);
@@ -75,7 +71,8 @@ export function initTextLabeler(ctx, style, zoom) {
   }
 
   function setAnchor(anchor) {
-    // Set baseline
+    // Set baseline. We let Canvas2D use textBaseline = "bottom", and use
+    // posShift to shift the text box for other requested baselines
     ctx.textBaseline = "bottom";
     switch (anchor) {
       case "top-left":
@@ -97,7 +94,8 @@ export function initTextLabeler(ctx, style, zoom) {
         //ctx.textBaseline = "middle";
         posShift[1] = 0.5;
     }
-    // Set textAlign
+    // Set textAlign. We let Canvas2D use textAlign = "left", and use
+    // posShift to shift the text box for other requested alignments
     ctx.textAlign = "left";
     switch (anchor) {
       case "top-left":
