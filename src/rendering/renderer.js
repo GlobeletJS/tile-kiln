@@ -2,9 +2,12 @@ import { getFeatures } from "./getFeatures.js";
 import { initPainter } from "./painter.js";
 import { initLabeler } from "./labeler.js";
 
-export function initRenderer(canvSize, styleLayers, sprite) {
+export function initRenderer(canvSize, styleLayers, styleGroups, sprite) {
+  // Input canvSize is an integer, for the pixel size of the (square) tiles
   // Input styleLayers points to the .layers property of a Mapbox style document
-  // Specification: https://docs.mapbox.com/mapbox-gl-js/style-spec/
+  //   Specification: https://docs.mapbox.com/mapbox-gl-js/style-spec/
+  // Input styleGroups is a list of style layer groups identified by a
+  //   "tilekiln-group" property of each layer
   // Input sprite (if defined) is an object with image and meta properties
 
   // Create canvas for rendering, set drawingbuffer size
@@ -16,41 +19,59 @@ export function initRenderer(canvSize, styleLayers, sprite) {
   const ctx = canvas.getContext("2d");
   ctx.save();
 
-  // Separate styles into paint and label types
-  const paintLayers = styleLayers.filter(layer => layer.type !== "symbol");
-  const labelLayers = styleLayers.filter(layer => layer.type === "symbol").reverse();
-
   // Initialize painter: paints a single layer onto the canvas
   const painter = initPainter(ctx);
   // Initialize labeler: draws text labels and "sprite" icons
   const labeler = initLabeler(ctx, sprite);
 
+  // Sort styles into groups
+  const styles = {};
+  styleGroups.forEach( group => {
+    styles[group] = sortStyleGroup(styleLayers, group);
+  });
+
+  var getLamina, composite;
+  if (styleGroups.length > 1) { 
+    // Define function to return the appropriate lamina (partial rendering)
+    getLamina = (tile, group) => tile.laminae[group];
+    // Define function to composite all laminae canvases into the main canvas
+    composite = (tile) => {
+      tile.ctx.clearRect(0, 0, canvSize, canvSize);
+      styleGroups.forEach( group => {
+        tile.ctx.drawImage(tile.laminae[group].img, 0, 0);
+      });
+      tile.rendered = true;
+    };
+  } else {
+    // Only one group of style layers. Render directly to the main canvas
+    getLamina = (tile, group) => tile;
+    // Compositing is not needed: return a dummy no-op function
+    composite = (tile) => true;
+  }
+
   return {
-    drawTile,
+    drawGroup,
+    composite,
     canvas,
   };
 
-  function drawTile(tile, callback = () => undefined) {
+  function drawGroup(tile, group = "none", callback = () => undefined) {
+    if (!styles[group]) return callback(null, tile);
+
+    // Clear context and bounding boxes
     ctx.clearRect(0, 0, canvSize, canvSize);
-
-    // Draw paint layers
-    paintLayers.forEach( style => drawLayer(style, tile.z, tile.sources) );
-
-    // Clear bounding boxes from previous draw
     labeler.clearBoxes();
-    // Draw label layers
-    labelLayers.forEach( style => drawLayer(style, tile.z, tile.sources) );
+
+    // Draw the layers
+    styles[group].forEach( style => drawLayer(style, tile.z, tile.sources) );
 
     // Copy the rendered image to the tile
-    //tile.img.onload = checkImg;
-    //tile.img.src = canvas.toDataURL(); // Slow!! >50ms for canvSize = 512
-    tile.ctx.drawImage(canvas, 0, 0); // 5-6ms. why not render to this ctx in the first place?
-    checkImg();
+    let lamina = getLamina(tile, group);
+    lamina.ctx.clearRect(0, 0, canvSize, canvSize);
+    lamina.ctx.drawImage(canvas, 0, 0);
     
-    function checkImg() {
-      tile.rendered = true;
-      return callback(null, tile);
-    }
+    lamina.rendered = true;
+    return callback(null, tile);
   }
 
   function drawLayer(style, zoom, sources) {
@@ -90,4 +111,17 @@ export function initRenderer(canvSize, styleLayers, sprite) {
     }
     return;
   }
+}
+
+function sortStyleGroup(layers, groupName) {
+  // Get the layers belonging to this group
+  var group = (groupName === "none")
+    ? layers.filter(layer => !layer["tilekiln-group"]) // Layers with no group specified
+    : layers.filter(layer => layer["tilekiln-group"] === groupName);
+
+  // Reverse the order of the symbol layers
+  var labels = group.filter(layer => layer.type === "symbol").reverse();
+
+  // Append reordered symbol layers to non-symbol layers
+  return group.filter(layer => layer.type !== "symbol").concat(labels);
 }

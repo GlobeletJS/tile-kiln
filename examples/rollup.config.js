@@ -49,4 +49,16 @@ export default [{
     format: 'iife',
     name: 'labels',
   },
+}, {
+  input: 'sandwich/main.js',
+  plugins: [
+    resolve(),
+    commonjs(),
+    json(),
+  ],
+  output: {
+    file: 'sandwich/main.min.js',
+    format: 'iife',
+    name: 'sandwich',
+  },
 }];

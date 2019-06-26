@@ -2,46 +2,80 @@
 
 import { initDisplay } from "./display.js";
 import * as tilekiln from "../../dist/tilekiln.bundle.js";
+import { initTouchy } from 'touchy';
+import { findNearest } from "./findNearest.js";
 
-const tzxy = [6, 14, 26];
+const tzxy = [7, 28, 52];
 
 export function main() {
   // Initialize the display canvas and rendering context
-  const dctx = initDisplay('map');
+  const display = initDisplay('map');
+
+  // Set up mouse tracking
+  const cursor = initTouchy(display.element); 
+
+  // Get a link to the tile coordinates printout
+  var title = document.getElementById("zxy");
+  var linesVisible = true;
+  var hillshadeVisible = true;
+  var currentTile, nextTile;
+
+  // Get a link to the feature info printout
+  var info = document.getElementById("info");
 
   // Initialize tile factory
   const tileMaker = tilekiln.init({
     size: 512,
-    style: "mapbox://styles/mapbox/streets-v8",
+    style: "./wells_style.json", //"mapbox://styles/mapbox/streets-v8",
     token: "pk.eyJ1IjoiamhlbWJkIiwiYSI6ImNqcHpueHpyZjBlMjAzeG9kNG9oNzI2NTYifQ.K7fqhk2Z2YZ8NIV94M-5nA", 
     callback: setup,
   });
 
-  // Get a link to the tile coordinates printout
-  var title = document.getElementById("zxy");
-  // Get a link to the source data printout
-  var info = document.getElementById("info");
-
-  var linesVisible = true;
-  var hillshadeVisible = true;
-  var currentTile;
-
   // Get first tile, setup interaction
   function setup(err, api) {
     if (err) return console.log(err);
-    update();
     initHandlers();
+    update();
+    requestAnimationFrame(checkRender);
+  }
+
+  function checkRender(time) {
+    if (currentTile) {
+      // Find the well nearest the cursor
+      var box = display.element.getBoundingClientRect();
+      var x = cursor.x() - box.left;
+      var y = cursor.y() - box.top;
+      var layers = currentTile.sources["wells"];
+      var data = layers["TWDB_Groundwater_v2"];
+      var feature = findNearest(x, y, 5, data.features);
+      // Print to info div
+      info.innerHTML = "<pre>" + JSON.stringify(feature, null, 2) + "</pre>";
+
+      // Select this feature in the highlighted-well style
+      var styles = tileMaker.style.layers;
+      var highlighter = styles.find(layer => layer.id === "highlighted-well");
+
+      if (feature && feature.properties) {
+        highlighter.filter[2] = feature.properties.title.toString();
+      }
+      //tileMaker.redraw(currentTile);
+      tileMaker.drawGroup(currentTile, "highlight");
+      tileMaker.composite(currentTile);
+      display.context.drawImage(currentTile.img, 0, 0);
+    }
+
+    requestAnimationFrame(checkRender);
   }
 
   function update() {
-    currentTile = tileMaker.create(tzxy[0], tzxy[1], tzxy[2], displayTile);
+    nextTile = tileMaker.create(tzxy[0], tzxy[1], tzxy[2], displayTile);
   }
   function displayTile(err, tile) {
     if (err) return console.log(err);
+    currentTile = nextTile;
     // Copy the renderer canvas onto our display canvas
-    dctx.drawImage(tile.img, 0, 0);
+    //display.context.drawImage(tile.img, 0, 0); // Move to animation loop
     title.innerHTML = "z/x/y = " + tzxy[0] + "/" + tzxy[1] + "/" + tzxy[2];
-    //info.innerHTML = "<pre>" + JSON.stringify(tile.sources.composite, null, 2) + "</pre>";
   }
 
   function toggleLines() {

@@ -9,12 +9,14 @@ export function init(params) {
   var mbToken  = params.token;   // May be undefined
   var callback = params.callback || ( () => undefined );
 
-  // Declare some global functions that will be defined inside a callback
-  var tileFactory, renderer;
+  // Declare some variables & methods that will be defined inside a callback
+  var styleGroups, tileFactory, renderer;
 
   const api = { // Initialize properties, update when styles load
     style: {},    // WARNING: directly modifiable from calling program
     create: () => undefined,
+    drawGroup: (group) => undefined,
+    composite: () => undefined,
     redraw: () => undefined,
     ready: false,
   };
@@ -26,13 +28,32 @@ export function init(params) {
 
   function setup(err, styleDoc) {
     if (err) callback(err);
-    tileFactory = initTileFactory(canvSize, styleDoc.sources);
-    renderer = initRenderer(canvSize, styleDoc.layers, styleDoc.sprite);
+
+    // Get layer group names from styleDoc
+    styleGroups = styleDoc.layers
+      .map( layer => layer["tilekiln-group"] || "none" )
+      .filter(uniq);
+
+    // Make sure the groups in order, not interleaved
+    var groupCheck = styleGroups.sort().filter(uniq);
+    if (styleGroups.length !== groupCheck.length) {
+      err = "tilekiln setup: Input layer groups are not in order!";
+      return callback(err);
+    }
+    
+    function uniq(x, i, a) {
+      return ( !i || x !== a[i-1] ); // x is not a repeat of the previous value
+    }
+
+    tileFactory = initTileFactory(canvSize, styleDoc.sources, styleGroups);
+    renderer = initRenderer(canvSize, styleDoc.layers, styleGroups, styleDoc.sprite);
 
     // Update api
     api.style = styleDoc;
     api.create = create;
-    api.redraw = renderer.drawTile;
+    api.drawGroup = renderer.drawGroup;
+    api.composite = renderer.composite;
+    api.redraw = drawAll;
     api.ready = true;
 
     return callback(null, api);
@@ -42,8 +63,15 @@ export function init(params) {
     var tile = tileFactory(z, x, y, render);
     function render(err) {
       if (err) cb(err);
-      renderer.drawTile(tile, cb);
+      drawAll(tile);
+      return cb(null, tile);
     }
     return tile;
+  }
+
+  function drawAll(tile, callback = () => true) {
+    styleGroups.forEach( group => renderer.drawGroup(tile, group) );
+    renderer.composite(tile);
+    callback(null, tile);
   }
 }

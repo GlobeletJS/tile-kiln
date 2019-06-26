@@ -2,9 +2,11 @@ import { readMVT, loadImage } from "./read.js";
 
 // TODO: Move this to a worker thread. readMVT is CPU intensive
 // Also, convert images to ImageBitmaps?
-export function initTileFactory(size, sources) {
+export function initTileFactory(size, sources, layerGroupNames) {
   // Input size is the pixel size of the canvas used for vector rendering
   // Input sources is an OBJECT of TileJSON descriptions of tilesets
+  // Input layerGroupNames is an ARRAY of names for groupings of style layers
+  //   that will be rendered to separate canvases before compositing
 
   // For now we ignore sources that don't have tile endpoints
   const tileSourceKeys = Object.keys(sources).filter( k => {
@@ -12,17 +14,23 @@ export function initTileFactory(size, sources) {
   });
 
   function orderTile(z, x, y, callback = () => true) {
+    var baseLamina = initLamina(size);
     const tile = {
       z, x, y,
       sources: {},
       loaded: false,
-      rendered: false,
+      img: baseLamina.img,
+      ctx: baseLamina.ctx,
+      rendered: baseLamina.rendered,
+      laminae: {},
     };
-    // Add a canvas for rendering results
-    tile.img = document.createElement("canvas");
-    tile.img.width = size;
-    tile.img.height = size;
-    tile.ctx = tile.img.getContext("2d");
+
+    // Add canvases for separate rendering of layer groups, if supplied
+    if (layerGroupNames && layerGroupNames.length > 1) {
+      layerGroupNames.forEach( group => {
+        tile.laminae[group] = initLamina(size);
+      });
+    }
 
     var numToDo = tileSourceKeys.length;
     tileSourceKeys.forEach( loadTile );
@@ -50,6 +58,17 @@ export function initTileFactory(size, sources) {
   }
 
   return orderTile;
+}
+
+function initLamina(size) {
+  let img = document.createElement("canvas");
+  img.width = size;
+  img.height = size;
+  return { 
+    img, 
+    ctx: img.getContext("2d"),
+    rendered: false,
+  };
 }
 
 function tileURL(endpoint, z, x, y) {
