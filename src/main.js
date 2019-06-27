@@ -61,7 +61,7 @@ export function init(params) {
     return callback(null, api);
   }
 
-  function create(z, x, y, cb) {
+  function create(z, x, y, cb = () => undefined) {
     var tile = tileFactory(z, x, y, render);
     function render(err) {
       if (err) cb(err);
