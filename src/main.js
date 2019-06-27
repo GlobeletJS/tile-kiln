@@ -18,6 +18,7 @@ export function init(params) {
     drawGroup: (group) => undefined,
     composite: () => undefined,
     redraw: () => undefined,
+    groups: [],
     ready: false,
   };
 
@@ -55,6 +56,7 @@ export function init(params) {
     api.composite = renderer.composite;
     api.redraw = drawAll;
     api.ready = true;
+    api.groups = styleGroups;
 
     return callback(null, api);
   }
