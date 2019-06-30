@@ -1,5 +1,5 @@
 import * as d3 from 'd3-geo';
-import { evalStyle } from "./styleFunction.js";
+import { evalStyle, buildStyleFunc } from "./styleFunction.js";
 
 export function initPainter(ctx) {
   // Input ctx is a Canvas 2D rendering context
@@ -53,28 +53,48 @@ export function initPainter(ctx) {
   }
 
   function drawLines(style, zoom, data) {
-    ctx.beginPath();
-    setStyle("lineCap", style.layout["line-cap"], zoom);
-    setStyle("lineJoin", style.layout["line-join"], zoom);
-    setStyle("miterLimit", style.layout["line-miter-limit"], zoom);
-    // Missing line-round-limit
-    setStyle("strokeStyle", style.paint["line-color"], zoom);
+    //ctx.beginPath();
+    var layout = style.layout;
+    if (layout) {
+      setStyle("lineCap", layout["line-cap"], zoom);
+      setStyle("lineJoin", layout["line-join"], zoom);
+      setStyle("miterLimit", layout["line-miter-limit"], zoom);
+      // Missing line-round-limit
+    }
+    //setStyle("strokeStyle", style.paint["line-color"], zoom);
     setStyle("lineWidth", style.paint["line-width"], zoom);
     setStyle("globalAlpha", style.paint["line-opacity"], zoom);
     // Missing line-gap-width, line-translate, line-translate-anchor,
     //  line-offset, line-blur, line-gradient, line-pattern, line-dasharray
-    path(data);
-    ctx.stroke();
+    //path(data);
+    //ctx.stroke();
+    var getColor = buildStyleFunc(style.paint["line-color"]);
+    // TODO: Don't loop over features unless we have data-driven styles
+    data.features.forEach(feature => {
+      ctx.strokeStyle = getColor(zoom, feature);
+      ctx.beginPath();
+      path(feature);
+      ctx.stroke();
+    });
   }
 
   function drawFills(style, zoom, data) {
-    ctx.beginPath();
-    setStyle("fillStyle", style.paint["fill-color"], zoom);
-    setStyle("globalAlpha", style.paint["fill-opacity"], zoom);
+    //ctx.beginPath();
+    //setStyle("fillStyle", style.paint["fill-color"], zoom);
+    //setStyle("globalAlpha", style.paint["fill-opacity"], zoom);
     // Missing fill-outline-color, fill-translate, fill-translate-anchor,
     //  fill-pattern
-    path(data);
-    ctx.fill();
+    //path(data);
+    //ctx.fill();
+    var getColor = buildStyleFunc(style.paint["fill-color"]);
+    var getAlpha = buildStyleFunc(style.paint["fill-opacity"]);
+    data.features.forEach(feature => {
+      ctx.fillStyle = getColor(zoom, feature);
+      ctx.globalAlpha = getAlpha(zoom, feature);
+      ctx.beginPath();
+      path(feature);
+      ctx.fill();
+    });
   }
 
   function setStyle(option, val, zoom) { // Nested for access to ctx

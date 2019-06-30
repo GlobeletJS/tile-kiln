@@ -1,63 +1,76 @@
 import { parseCSSColor } from 'csscolorparser';
 
 export function evalStyle(styleFunction, zoom) {
-  // Quick exit if styleFunction is a constant or undefined
-  if (typeof styleFunction !== "object") return styleFunction;
-  // Exit if we have an array (e.g., for text-font)
-  if (Array.isArray(styleFunction)) return styleFunction;
+  var styleFunc = buildStyleFunc(styleFunction);
+  return styleFunc(zoom);
+}
 
-  const stops = styleFunction.stops;
+export function buildStyleFunc(style) {
+  // For constant styles (not a function) always return the style
+  if (typeof style !== "object" || Array.isArray(style)) return () => style;
+
+  var property = style.property;
+  var dataDependent = (property && property !== "zoom");
+
+  // Identity functions: Return the zoom or requested feature property
+  if (style.type === "identity") {
+    return (dataDependent)
+      ? (zoom, feature) => feature.properties[property]
+      : (zoom) => zoom;
+  }
+
+  // We should be building a stop function now. Make sure we have enough info
+  var stops = style.stops;
   if (!stops || stops.length < 2 || stops[0].length !== 2) {
-    console.log("evalStyle: styleFunction = " + JSON.stringify(styleFunction));
-    console.log("ERROR in evalStyle: failed to understand styleFunction!");
+    console.log("buildStyleFunc: style = " + JSON.stringify(style));
+    console.log("ERROR in buildStyleFunc: failed to understand style!");
     return;
   }
 
-  // Find which stops the current zoom level falls between
-  var numStops = stops.length;
-  var iz = 0;
-  //while (iz < numStops && zoom > stops[iz][0]) iz++;
-  while (iz < numStops && zoom >= stops[iz][0]) iz++;
+  var stopFunc = buildStopFunc(stops, style.base);
+  return (dataDependent)
+    ? (zoom, feature) => stopFunc(feature.properties[property])
+    : (zoom) => stopFunc(zoom);
+}
 
-  // Quick exit if we are outside the stops
-  if (iz === 0) return stops[0][1];
-  if (iz === numStops) return stops[iz - 1][1];
+function buildStopFunc(stops, base = 1) {
+  const izm = stops.length - 1;
+  const interpolate = getInterpolator(stops[0][1]);
 
-  // Interpolate the values
-  var base = styleFunction.base || 1;
-  var t = interpFactor(base, stops[iz-1][0], zoom, stops[iz][0]);
-  var lowVal = stops[iz - 1][1];
+  return function(x) {
+    let iz = stops.findIndex(stop => stop[0] > x);
 
-  var valType = typeof lowVal;
+    if (iz === 0) return stops[0][1]; // x is below first stop
+    if (iz < 0) return stops[izm][1]; // x is above last stop
 
-  // Simple interpolation for numerical values
-  if (valType === "number") return lowVal + t * (stops[iz][1] - lowVal);
+    let t = interpFactor(base, stops[iz-1][0], x, stops[iz][0]);
 
-  // Check for valid CSS colors
-  var color1 = (valType === "string")
-    ? parseCSSColor(lowVal)
-    : null;
+    return interpolate(stops[iz-1][1], stops[iz][1], t);
+  }
+}
 
-  if (!color1) return lowVal; // Assume step function
+function getInterpolator(sampleVal) {
+  var type = typeof sampleVal;
 
-  // Interpolate colors
-  var color2 = parseCSSColor(stops[iz][1]);
-  return interpColor(color1, color2, t);
+  // Linear interpolator for numbers
+  if (type === "number") return (v1, v2, t) => v1 + t * (v2 - v1);
+
+  var isColor = (type === "string" && parseCSSColor(sampleVal));
+  return (isColor)
+    ? (v1, v2, t) => interpColor(parseCSSColor(v1), parseCSSColor(v2), t)
+    : (v1, v2, t) => v1; // Assume step function for other types
 }
 
 function interpFactor(base, x0, x, x1) {
   // Follows mapbox-gl-js, style-spec/function/index.js.
   // NOTE: https://github.com/mapbox/mapbox-gl-js/issues/2698 not addressed!
   const range = x1 - x0;
-  const dx = x - x0;
+  if (range === 0) return 0;
 
-  if (range === 0) {
-    return 0;
-  } else if (base === 1) {
-    return dx / range;
-  } else {
-    return (Math.pow(base, dx) - 1) / (Math.pow(base, range) - 1);
-  }
+  const dx = x - x0;
+  if (base === 1) return dx / range;
+
+  return (Math.pow(base, dx) - 1) / (Math.pow(base, range) - 1);
 }
 
 function interpColor(c0, c1, t) {

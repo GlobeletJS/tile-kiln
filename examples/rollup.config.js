@@ -3,17 +3,6 @@ import commonjs from 'rollup-plugin-commonjs'; // Yuck... needed for iee754 pack
 import json from 'rollup-plugin-json';
 
 export default [{
-  input: 'counties/main.js',
-  plugins: [
-    resolve(),
-    json(),
-  ],
-  output: {
-    file: 'counties/main.min.js',
-    format: 'iife',
-    name: 'counties',
-  },
-}, {
   input: 'mvt/main.js',
   plugins: [
     resolve(),
@@ -60,5 +49,17 @@ export default [{
     file: 'sandwich/main.min.js',
     format: 'iife',
     name: 'sandwich',
+  },
+}, {
+  input: 'macrostrat/main.js',
+  plugins: [
+    resolve(),
+    commonjs(),
+    json(),
+  ],
+  output: {
+    file: 'macrostrat/main.min.js',
+    format: 'iife',
+    name: 'macrostrat',
   },
 }];
