@@ -73,13 +73,13 @@ export function initBrush(ctx) {
   function draw(data, dataDependencies, zoom, method) {
     if (dataDependencies.length == 0) return drawPath(data, method);
 
-    //sortAndDraw(data, dataDependencies, zoom, method);
-    data.features.forEach(feature => {
-      dataDependencies.forEach( dep => {
-        dep.stateFunc( dep.styleFunc(zoom, feature) )
-      });
-      drawPath(feature, method);
-    });
+    sortAndDraw(data, dataDependencies, zoom, method);
+    //data.features.forEach(feature => {
+    //  dataDependencies.forEach( dep => {
+    //    dep.stateFunc( dep.styleFunc(zoom, feature) )
+    //  });
+    // drawPath(feature, method);
+    //});
   }
 
   function drawPath(data, method) {
@@ -89,51 +89,33 @@ export function initBrush(ctx) {
   }
 
   function sortAndDraw(data, dataDependencies, zoom, method) {
-    //let t1, t2;
-    //t1 = performance.now();
-
-    // Build an array of the styles for each feature, with a sortable id
-    let featureStyles = data.features.map( feature => {
+    // Build an array of features, style values, and a sortable id
+    let features = data.features.map( feature => {
       let vals = dataDependencies.map( dep => dep.styleFunc(zoom, feature) );
       let id = vals.join("");
-      return { id, vals };
+      return { id, vals, feature };
     });
 
-    // Get a list of the unique styles
-    let uniqStyles = featureStyles.slice()
-      .sort( (a, b) => (a.id < b.id) ? -1 : 1 )  // Sort by .id
-      .filter( (x, i, a) => !i || x.id !== a[i-1].id ); // Drop repeat values
+    // Sort the array
+    features.sort( (a, b) => (a.id < b.id) ? -1 : 1 );
 
-    //console.log("Shortened from " + featureStyles.length + " to " + uniqStyles.length);
-
-    //t2 = performance.now();
-    //console.log("sortAndDraw: listing time = " + Math.round(t2 - t1) + "ms");
-    //t1 = t2;
-
-    // Gather the data for each style
-    uniqStyles.forEach( style => {
-      let subset = data.features.filter( (feature, index) => {
-        return (featureStyles[index].id === style.id);
-      });
-      //style.data = { type: "FeatureCollection", features: subset };
-      let newData = { type: "FeatureCollection", features: subset };
-    //});
-
-    //t2 = performance.now();
-    //console.log("sortAndDraw: sorting time = " + Math.round(t2 - t1) + "ms");
-    //t1 = t2;
-
-    // Render the features for each unique style
-    //uniqStyles.forEach(style => {
-      // Set the data-dependent states for this style
+    // Loop through the array, accumulating paths and rendering
+    let numFeatures = features.length;
+    let i = 0;
+    while (i < numFeatures) {
+      // Set state for this group of features (only when style id changes)
       dataDependencies.forEach( (dep, index) => {
-        dep.stateFunc(style.vals[index]);
+        dep.stateFunc(features[i].vals[index]);
       });
-      //drawPath(style.data, method);
-      drawPath(newData, method);
-    });
-
-    //t2 = performance.now();
-    //console.log("sortAndDraw: drawing time = " + Math.round(t2 - t1) + "ms");
+      // Add these features to the path
+      ctx.beginPath();
+      let id = features[i].id;
+      while (i < numFeatures && features[i].id === id) {
+        path(features[i].feature);
+        i++;
+      }
+      // Render these features
+      ctx[method]();
+    }
   }
 }
