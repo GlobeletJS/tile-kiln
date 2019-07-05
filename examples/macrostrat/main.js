@@ -5,7 +5,7 @@ import * as tilekiln from "../../dist/tilekiln.bundle.js";
 import { initTouchy } from 'touchy';
 import { findNearest } from "./findNearest.js";
 
-const tzxy = [7, 28, 52];
+const tzxy = [6, 16, 25]; // This tile takes 240-250ms with version #e5da070f...
 
 export function main() {
   // Initialize the display canvas and rendering context
@@ -69,14 +69,16 @@ export function main() {
   }
 
   function update() {
-    nextTile = tileMaker.create(tzxy[0], tzxy[1], tzxy[2], displayTile);
+    var checkTime = true;
+    nextTile = tileMaker.create(tzxy[0], tzxy[1], tzxy[2], displayTile, checkTime);
   }
-  function displayTile(err, tile) {
+  function displayTile(err, tile, time) {
     if (err) return console.log(err);
     currentTile = nextTile;
     // Copy the renderer canvas onto our display canvas
     //display.context.drawImage(tile.img, 0, 0); // Move to animation loop
     title.innerHTML = "z/x/y = " + tzxy[0] + "/" + tzxy[1] + "/" + tzxy[2];
+    info.innerHTML = "Render time: " + Math.round(time) + "ms";
   }
 
   function toggleLines() {

@@ -10,7 +10,7 @@ export function init(params) {
   var callback = params.callback || ( () => undefined );
 
   // Declare some variables & methods that will be defined inside a callback
-  var styleGroups, tileFactory, renderer;
+  var styleGroups, tileFactory, renderer, t1, t2;
 
   const api = { // Initialize properties, update when styles load
     style: {},    // WARNING: directly modifiable from calling program
@@ -61,12 +61,15 @@ export function init(params) {
     return callback(null, api);
   }
 
-  function create(z, x, y, cb = () => undefined) {
+  function create(z, x, y, cb = () => undefined, reportTime) {
     var tile = tileFactory(z, x, y, render);
     function render(err) {
       if (err) cb(err);
+      if (reportTime) t1 = performance.now();
       drawAll(tile);
-      return cb(null, tile);
+      if (!reportTime) return cb(null, tile);
+      t2 = performance.now();
+      return cb(null, tile, t2 - t1);
     }
     return tile;
   }

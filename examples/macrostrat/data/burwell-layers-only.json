@@ -1,15 +1,3 @@
-{
-  "version": 8,
-  "sources": {
-    "burwell": {
-      "type": "vector",
-      "tiles": [
-        "https://tiles.macrostrat.org/carto/{z}/{x}/{y}.mvt"
-      ],
-      "tileSize": 512
-    }
-  },
-  "layers": [
     {
       "id": "burwell_fill",
       "type": "fill",
@@ -40,7 +28,10 @@
       "minzoom": 0,
       "maxzoom": 16,
       "paint": {
-        "line-color": "#777777",
+        "line-color": {
+          "property": "color",
+          "type": "identity"
+        },
         "line-width": {
           "stops": [
             [0, 0.15],
@@ -564,5 +555,3 @@
         "line-opacity": 1
       }
     }
-  ]
-}

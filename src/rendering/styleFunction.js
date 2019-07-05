@@ -6,18 +6,30 @@ export function evalStyle(styleFunction, zoom) {
 }
 
 export function buildStyleFunc(style) {
-  // For constant styles (not a function) always return the style
-  if (typeof style !== "object" || Array.isArray(style)) return () => style;
+  var styleFunc, getArg;
 
-  var property = style.property;
-  var dataDependent = (property && property !== "zoom");
+  if (typeof style !== "object" || Array.isArray(style)) {
+    // Includes the case style === undefined
+    styleFunc = () => style;
+    styleFunc.type = "constant";
 
-  // Identity functions: Return the zoom or requested feature property
-  if (style.type === "identity") {
-    return (dataDependent)
-      ? (zoom, feature) => feature.properties[property]
-      : (zoom) => zoom;
-  }
+  } else if (!style.property || style.property === "zoom") {
+    getArg = (zoom, feature) => zoom;
+    styleFunc = getStyleFunc(style, getArg);
+    styleFunc.type = "zoom";
+
+  } else {
+    getArg = (zoom, feature) => feature.properties[style.property];
+    styleFunc = getStyleFunc(style, getArg);
+    styleFunc.type = "property";
+
+  } // NOT IMPLEMENTED: zoom-and-property functions
+
+  return styleFunc;
+}
+
+function getStyleFunc(style, getArg) {
+  if (style.type === "identity") return getArg;
 
   // We should be building a stop function now. Make sure we have enough info
   var stops = style.stops;
@@ -28,9 +40,7 @@ export function buildStyleFunc(style) {
   }
 
   var stopFunc = buildStopFunc(stops, style.base);
-  return (dataDependent)
-    ? (zoom, feature) => stopFunc(feature.properties[property])
-    : (zoom) => stopFunc(zoom);
+  return (zoom, feature) => stopFunc( getArg(zoom, feature) );
 }
 
 function buildStopFunc(stops, base = 1) {

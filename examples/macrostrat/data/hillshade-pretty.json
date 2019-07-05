@@ -1,0 +1,41 @@
+{
+  "version": 8,
+  "name": "basic-hillshade",
+  "metadata": {
+    "mapbox:autocomposite": true,
+    "mapbox:type": "default",
+    "mapbox:trackposition": true,
+    "mapbox:sdk-support": { "js": "0.54.0", "android": "6.7.0", "ios": "4.7.0" }
+  },
+  "light": { "intensity": 0.55 },
+  "sources": {
+    "mapbox://mapbox.terrain-rgb": { "url": "mapbox://mapbox.terrain-rgb", "type": "raster-dem", "tileSize": 256 }
+  },
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "layout": { },
+      "paint": { "background-color": { "base": 1, "stops": [[11, "hsl(0, 0%, 94%)"], [13, "hsl(0, 0%, 90%)"]] } }
+    },
+    {
+      "type": "hillshade",
+      "paint": {
+        "hillshade-exaggeration": { "base": 1, "stops": [[0, 0.4], [5, 0.8], [16, 0.2]] },
+        "hillshade-shadow-color": "hsl(0, 0%, 0%)",
+        "hillshade-illumination-anchor": "map",
+        "hillshade-highlight-color": "hsl(0, 0%, 100%)",
+        "hillshade-accent-color": "hsl(0, 0%, 0%)"
+      },
+      "layout": { },
+      "id": "mapbox-terrain-rgb",
+      "source": "mapbox://mapbox.terrain-rgb"
+    }
+  ],
+  "created": "2019-07-01T17:03:00.508Z",
+  "id": "cjxkmtd7a03fr1coo3psew1q5",
+  "modified": "2019-07-01T17:03:00.508Z",
+  "owner": "jhembd",
+  "visibility": "private",
+  "draft": false
+}

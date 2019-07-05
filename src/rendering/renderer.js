@@ -1,5 +1,6 @@
 import { getFeatures } from "./getFeatures.js";
-import { initPainter } from "./painter.js";
+import { initRoller } from "./roller.js";
+import { initBrush } from "./brush.js";
 import { initLabeler } from "./labeler.js";
 
 export function initRenderer(canvSize, styleLayers, styleGroups, sprite) {
@@ -19,8 +20,9 @@ export function initRenderer(canvSize, styleLayers, styleGroups, sprite) {
   const ctx = canvas.getContext("2d");
   ctx.save();
 
-  // Initialize painter: paints a single layer onto the canvas
-  const painter = initPainter(ctx);
+  // Initialize roller and brush, to paint single layers onto the canvas
+  const roller = initRoller(ctx);
+  const brush = initBrush(ctx);
   // Initialize labeler: draws text labels and "sprite" icons
   const labeler = initLabeler(ctx, sprite);
 
@@ -86,30 +88,18 @@ export function initRenderer(canvSize, styleLayers, styleGroups, sprite) {
     // later, we need to re-save what we just restored
     ctx.save();
 
-    if (style.type === "background") return painter.fillBackground(style, zoom);
+    if (style.type === "background") return roller.fillBackground(style, zoom);
 
     var source = sources[ style["source"] ];
-    if (style.type === "raster") return painter.drawRaster(style, zoom, source);
+    if (style.type === "raster") return roller.drawRaster(style, zoom, source);
 
     var mapLayer = source[ style["source-layer"] ];
     var mapData = getFeatures(mapLayer, style.filter);
     if (!mapData) return;
 
-    switch (style.type) {
-      case "circle":  // Point or MultiPoint geometry
-        return painter.drawCircles(style, zoom, mapData);
-      case "line":    // LineString, MultiLineString, Polygon, or MultiPolygon
-        return painter.drawLines(style, zoom, mapData);
-      case "fill":    // Polygon or MultiPolygon (maybe also linestrings?)
-        return painter.drawFills(style, zoom, mapData);
-      case "symbol":  // Labels
-        return labeler.draw(style, zoom, mapData);
-      default:
-        // Missing fill-extrusion, heatmap, hillshade
-        console.log("ERROR in drawLayer: layer.type = " + style.type +
-            " not supported!");
-    }
-    return;
+    return (style.type === "symbol") 
+      ? labeler.draw(style, zoom, mapData)
+      : brush(style, zoom, mapData);
   }
 }
 
