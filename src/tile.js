@@ -2,11 +2,11 @@ import { readMVT, loadImage } from "./read.js";
 
 // TODO: Move this to a worker thread. readMVT is CPU intensive
 // Also, convert images to ImageBitmaps?
-export function initTileFactory(size, sources, layerGroupNames) {
+export function initTileFactory(size, sources, styleGroups) {
   // Input size is the pixel size of the canvas used for vector rendering
   // Input sources is an OBJECT of TileJSON descriptions of tilesets
-  // Input layerGroupNames is an ARRAY of names for groupings of style layers
-  //   that will be rendered to separate canvases before compositing
+  // Input styleGroups is an ARRAY of objects { name, visible } for groupings of
+  // style layers that will be rendered to separate canvases before compositing
 
   // For now we ignore sources that don't have tile endpoints
   const tileSourceKeys = Object.keys(sources).filter( k => {
@@ -26,9 +26,9 @@ export function initTileFactory(size, sources, layerGroupNames) {
     };
 
     // Add canvases for separate rendering of layer groups, if supplied
-    if (layerGroupNames && layerGroupNames.length > 1) {
-      layerGroupNames.forEach( group => {
-        tile.laminae[group] = initLamina(size);
+    if (styleGroups && styleGroups.length > 1) {
+      styleGroups.forEach( group => {
+        tile.laminae[group.name] = initLamina(size);
       });
     }
 

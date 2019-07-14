@@ -16,8 +16,8 @@ export function main() {
 
   // Get a link to the tile coordinates printout
   var title = document.getElementById("zxy");
-  var linesVisible = true;
-  var hillshadeVisible = true;
+  var burwellVisible = true;
+  var labelsVisible = true;
   var currentTile, nextTile;
 
   // Get a link to the feature info printout
@@ -26,7 +26,7 @@ export function main() {
   // Initialize tile factory
   const tileMaker = tilekiln.init({
     size: 512,
-    style: "./data/macrostrat-sandwich.json",
+    style: "./data/macrostrat-grouped.json", //sandwich.json",
     token: "pk.eyJ1IjoiamhlbWJkIiwiYSI6ImNqcHpueHpyZjBlMjAzeG9kNG9oNzI2NTYifQ.K7fqhk2Z2YZ8NIV94M-5nA",
     callback: setup,
   });
@@ -81,44 +81,32 @@ export function main() {
     info.innerHTML = "Render time: " + Math.round(time) + "ms";
   }
 
-  function toggleLines() {
-    linesVisible = !linesVisible;
-    var visText = (linesVisible)
-      ? "visible"
-      : "none";
-
-    tileMaker.style.layers.forEach(setLineVisibility);
-
-    tileMaker.redraw(currentTile, displayTile);
-
-    function setLineVisibility(layer) {
-      if (layer.type !== "line") return;
-      layer.layout.visibility = visText;
+  function toggleBurwell() {
+    burwellVisible = !burwellVisible;
+    if (burwellVisible) {
+      tileMaker.showGroup("burwell");
+    } else {
+      tileMaker.hideGroup("burwell");
     }
+    tileMaker.composite(currentTile);
   }
 
-  function toggleHillshade() {
-    hillshadeVisible = !hillshadeVisible;
-    var visText = (hillshadeVisible)
-      ? "visible"
-      : "none";
-
-    tileMaker.style.layers.forEach(setHillshadeVisibility);
-
-    tileMaker.redraw(currentTile, displayTile);
-
-    function setHillshadeVisibility(layer) {
-      if (layer["source-layer"] !== "hillshade") return;
-      layer.layout.visibility = visText;
+  function toggleLabels() {
+    labelsVisible = !labelsVisible;
+    if (labelsVisible) {
+      tileMaker.showGroup("labels");
+    } else {
+      tileMaker.hideGroup("labels");
     }
+    tileMaker.composite(currentTile);
   }
 
   function initHandlers() {
-    const lineToggle = document.getElementById("toggleLines");
-    lineToggle.addEventListener("click", toggleLines, false);
+    const burwellToggle = document.getElementById("toggleBurwell");
+    burwellToggle.addEventListener("click", toggleBurwell, false);
 
-    const hillshadeToggle = document.getElementById("toggleHillshade");
-    hillshadeToggle.addEventListener("click", toggleHillshade, false);
+    const labelToggle = document.getElementById("toggleLabels");
+    labelToggle.addEventListener("click", toggleLabels, false);
 
     const left = document.getElementById("left");
     const right = document.getElementById("right");

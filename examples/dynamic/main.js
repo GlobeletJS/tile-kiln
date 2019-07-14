@@ -12,7 +12,7 @@ export function main() {
   // Initialize tile factory
   const tileMaker = tilekiln.init({
     size: 512,
-    style: "./wells_style.json", //"mapbox://styles/mapbox/streets-v8",
+    style: "mapbox://styles/mapbox/streets-v8",
     token: "pk.eyJ1IjoiamhlbWJkIiwiYSI6ImNqcHpueHpyZjBlMjAzeG9kNG9oNzI2NTYifQ.K7fqhk2Z2YZ8NIV94M-5nA", 
     callback: setup,
   });

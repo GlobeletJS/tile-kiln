@@ -10,12 +10,20 @@ export function init(params) {
   var callback = params.callback || ( () => undefined );
 
   // Declare some variables & methods that will be defined inside a callback
-  var styleGroups, tileFactory, renderer, t1, t2;
+  var groupNames, tileFactory, renderer, t1, t2;
+  var styleGroups = [];
+
+  function setGroupVisibility(name, visibility) {
+    var group = styleGroups.find(group => group.name === name);
+    if (group) group.visible = visibility;
+  }
 
   const api = { // Initialize properties, update when styles load
     style: {},    // WARNING: directly modifiable from calling program
     create: () => undefined,
     drawGroup: (group) => undefined,
+    hideGroup: (name) => setGroupVisibility(name, false),
+    showGroup: (name) => setGroupVisibility(name, true),
     composite: () => undefined,
     redraw: () => undefined,
     groups: [],
@@ -31,13 +39,13 @@ export function init(params) {
     if (err) callback(err);
 
     // Get layer group names from styleDoc
-    styleGroups = styleDoc.layers
+    groupNames = styleDoc.layers
       .map( layer => layer["tilekiln-group"] || "none" )
       .filter(uniq);
 
     // Make sure the groups in order, not interleaved
-    var groupCheck = styleGroups.sort().filter(uniq);
-    if (styleGroups.length !== groupCheck.length) {
+    var groupCheck = groupNames.sort().filter(uniq);
+    if (groupNames.length !== groupCheck.length) {
       err = "tilekiln setup: Input layer groups are not in order!";
       return callback(err);
     }
@@ -46,17 +54,24 @@ export function init(params) {
       return ( !i || x !== a[i-1] ); // x is not a repeat of the previous value
     }
 
+    // Construct an object to track visibility of each group
+    styleGroups = groupNames.map( name => {
+      return { name, visible: true };
+    });
+
     tileFactory = initTileFactory(canvSize, styleDoc.sources, styleGroups);
     renderer = initRenderer(canvSize, styleDoc.layers, styleGroups, styleDoc.sprite);
 
     // Update api
+    // TODO: we could initialize renderer without styles, then send it the
+    // styles when ready. This could avoid the need to rewrite the API.
     api.style = styleDoc;
     api.create = create;
     api.drawGroup = renderer.drawGroup;
     api.composite = renderer.composite;
     api.redraw = drawAll;
     api.ready = true;
-    api.groups = styleGroups;
+    api.groups = groupNames;
 
     return callback(null, api);
   }
@@ -75,7 +90,7 @@ export function init(params) {
   }
 
   function drawAll(tile, callback = () => true) {
-    styleGroups.forEach( group => renderer.drawGroup(tile, group) );
+    styleGroups.forEach( group => renderer.drawGroup(tile, group.name) );
     renderer.composite(tile);
     callback(null, tile);
   }

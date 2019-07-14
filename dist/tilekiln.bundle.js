@@ -1570,11 +1570,11 @@ function expandTileURL(url, token) {
 
 // TODO: Move this to a worker thread. readMVT is CPU intensive
 // Also, convert images to ImageBitmaps?
-function initTileFactory(size, sources, layerGroupNames) {
+function initTileFactory(size, sources, styleGroups) {
   // Input size is the pixel size of the canvas used for vector rendering
   // Input sources is an OBJECT of TileJSON descriptions of tilesets
-  // Input layerGroupNames is an ARRAY of names for groupings of style layers
-  //   that will be rendered to separate canvases before compositing
+  // Input styleGroups is an ARRAY of objects { name, visible } for groupings of
+  // style layers that will be rendered to separate canvases before compositing
 
   // For now we ignore sources that don't have tile endpoints
   const tileSourceKeys = Object.keys(sources).filter( k => {
@@ -1594,9 +1594,9 @@ function initTileFactory(size, sources, layerGroupNames) {
     };
 
     // Add canvases for separate rendering of layer groups, if supplied
-    if (layerGroupNames && layerGroupNames.length > 1) {
-      layerGroupNames.forEach( group => {
-        tile.laminae[group] = initLamina(size);
+    if (styleGroups && styleGroups.length > 1) {
+      styleGroups.forEach( group => {
+        tile.laminae[group.name] = initLamina(size);
       });
     }
 
@@ -3047,24 +3047,25 @@ function initRenderer(canvSize, styleLayers, styleGroups, sprite) {
   // Sort styles into groups
   const styles = {};
   styleGroups.forEach( group => {
-    styles[group] = sortStyleGroup(styleLayers, group);
+    styles[group.name] = sortStyleGroup(styleLayers, group.name);
   });
 
   var getLamina, composite;
   if (styleGroups.length > 1) { 
     // Define function to return the appropriate lamina (partial rendering)
-    getLamina = (tile, group) => tile.laminae[group];
+    getLamina = (tile, groupName) => tile.laminae[groupName];
     // Define function to composite all laminae canvases into the main canvas
     composite = (tile) => {
       tile.ctx.clearRect(0, 0, canvSize, canvSize);
       styleGroups.forEach( group => {
-        tile.ctx.drawImage(tile.laminae[group].img, 0, 0);
+        if (!group.visible) return;
+        tile.ctx.drawImage(tile.laminae[group.name].img, 0, 0);
       });
       tile.rendered = true;
     };
   } else {
     // Only one group of style layers. Render directly to the main canvas
-    getLamina = (tile, group) => tile;
+    getLamina = (tile, groupName) => tile;
     // Compositing is not needed: return a dummy no-op function
     composite = (tile) => true;
   }
@@ -3075,18 +3076,18 @@ function initRenderer(canvSize, styleLayers, styleGroups, sprite) {
     canvas,
   };
 
-  function drawGroup(tile, group = "none", callback = () => undefined) {
-    if (!styles[group]) return callback(null, tile);
+  function drawGroup(tile, groupName = "none", callback = () => undefined) {
+    if (!styles[groupName]) return callback(null, tile);
 
     // Clear context and bounding boxes
     ctx.clearRect(0, 0, canvSize, canvSize);
     labeler.clearBoxes();
 
     // Draw the layers
-    styles[group].forEach( style => drawLayer(style, tile.z, tile.sources) );
+    styles[groupName].forEach( style => drawLayer(style, tile.z, tile.sources) );
 
     // Copy the rendered image to the tile
-    let lamina = getLamina(tile, group);
+    let lamina = getLamina(tile, groupName);
     lamina.ctx.clearRect(0, 0, canvSize, canvSize);
     lamina.ctx.drawImage(canvas, 0, 0);
     
@@ -3142,12 +3143,20 @@ function init(params) {
   var callback = params.callback || ( () => undefined );
 
   // Declare some variables & methods that will be defined inside a callback
-  var styleGroups, tileFactory, renderer, t1, t2;
+  var groupNames, tileFactory, renderer, t1, t2;
+  var styleGroups = [];
+
+  function setGroupVisibility(name, visibility) {
+    var group = styleGroups.find(group => group.name === name);
+    if (group) group.visible = visibility;
+  }
 
   const api = { // Initialize properties, update when styles load
     style: {},    // WARNING: directly modifiable from calling program
     create: () => undefined,
     drawGroup: (group) => undefined,
+    hideGroup: (name) => setGroupVisibility(name, false),
+    showGroup: (name) => setGroupVisibility(name, true),
     composite: () => undefined,
     redraw: () => undefined,
     groups: [],
@@ -3163,13 +3172,13 @@ function init(params) {
     if (err) callback(err);
 
     // Get layer group names from styleDoc
-    styleGroups = styleDoc.layers
+    groupNames = styleDoc.layers
       .map( layer => layer["tilekiln-group"] || "none" )
       .filter(uniq);
 
     // Make sure the groups in order, not interleaved
-    var groupCheck = styleGroups.sort().filter(uniq);
-    if (styleGroups.length !== groupCheck.length) {
+    var groupCheck = groupNames.sort().filter(uniq);
+    if (groupNames.length !== groupCheck.length) {
       err = "tilekiln setup: Input layer groups are not in order!";
       return callback(err);
     }
@@ -3178,17 +3187,24 @@ function init(params) {
       return ( !i || x !== a[i-1] ); // x is not a repeat of the previous value
     }
 
+    // Construct an object to track visibility of each group
+    styleGroups = groupNames.map( name => {
+      return { name, visible: true };
+    });
+
     tileFactory = initTileFactory(canvSize, styleDoc.sources, styleGroups);
     renderer = initRenderer(canvSize, styleDoc.layers, styleGroups, styleDoc.sprite);
 
     // Update api
+    // TODO: we could initialize renderer without styles, then send it the
+    // styles when ready. This could avoid the need to rewrite the API.
     api.style = styleDoc;
     api.create = create;
     api.drawGroup = renderer.drawGroup;
     api.composite = renderer.composite;
     api.redraw = drawAll;
     api.ready = true;
-    api.groups = styleGroups;
+    api.groups = groupNames;
 
     return callback(null, api);
   }
@@ -3207,7 +3223,7 @@ function init(params) {
   }
 
   function drawAll(tile, callback = () => true) {
-    styleGroups.forEach( group => renderer.drawGroup(tile, group) );
+    styleGroups.forEach( group => renderer.drawGroup(tile, group.name) );
     renderer.composite(tile);
     callback(null, tile);
   }

@@ -29,24 +29,25 @@ export function initRenderer(canvSize, styleLayers, styleGroups, sprite) {
   // Sort styles into groups
   const styles = {};
   styleGroups.forEach( group => {
-    styles[group] = sortStyleGroup(styleLayers, group);
+    styles[group.name] = sortStyleGroup(styleLayers, group.name);
   });
 
   var getLamina, composite;
   if (styleGroups.length > 1) { 
     // Define function to return the appropriate lamina (partial rendering)
-    getLamina = (tile, group) => tile.laminae[group];
+    getLamina = (tile, groupName) => tile.laminae[groupName];
     // Define function to composite all laminae canvases into the main canvas
     composite = (tile) => {
       tile.ctx.clearRect(0, 0, canvSize, canvSize);
       styleGroups.forEach( group => {
-        tile.ctx.drawImage(tile.laminae[group].img, 0, 0);
+        if (!group.visible) return;
+        tile.ctx.drawImage(tile.laminae[group.name].img, 0, 0);
       });
       tile.rendered = true;
     };
   } else {
     // Only one group of style layers. Render directly to the main canvas
-    getLamina = (tile, group) => tile;
+    getLamina = (tile, groupName) => tile;
     // Compositing is not needed: return a dummy no-op function
     composite = (tile) => true;
   }
@@ -57,18 +58,18 @@ export function initRenderer(canvSize, styleLayers, styleGroups, sprite) {
     canvas,
   };
 
-  function drawGroup(tile, group = "none", callback = () => undefined) {
-    if (!styles[group]) return callback(null, tile);
+  function drawGroup(tile, groupName = "none", callback = () => undefined) {
+    if (!styles[groupName]) return callback(null, tile);
 
     // Clear context and bounding boxes
     ctx.clearRect(0, 0, canvSize, canvSize);
     labeler.clearBoxes();
 
     // Draw the layers
-    styles[group].forEach( style => drawLayer(style, tile.z, tile.sources) );
+    styles[groupName].forEach( style => drawLayer(style, tile.z, tile.sources) );
 
     // Copy the rendered image to the tile
-    let lamina = getLamina(tile, group);
+    let lamina = getLamina(tile, groupName);
     lamina.ctx.clearRect(0, 0, canvSize, canvSize);
     lamina.ctx.drawImage(canvas, 0, 0);
     
