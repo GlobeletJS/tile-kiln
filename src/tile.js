@@ -1,8 +1,9 @@
-import { readMVT, loadImage } from "./read.js";
+//import { readMVT, loadImage } from "./read.js";
+import { loadImage } from "./read.js";
 
 // TODO: Move this to a worker thread. readMVT is CPU intensive
 // Also, convert images to ImageBitmaps?
-export function initTileFactory(size, sources, styleGroups) {
+export function initTileFactory(size, sources, styleGroups, reader) {
   // Input size is the pixel size of the canvas used for vector rendering
   // Input sources is an OBJECT of TileJSON descriptions of tilesets
   // Input styleGroups is an ARRAY of objects { name, visible } for groupings of
@@ -39,7 +40,10 @@ export function initTileFactory(size, sources, styleGroups) {
       var src = sources[srcKey];
       var tileHref = tileURL(src.tiles[0], z, x, y);
       if (src.type === "vector") {
-        readMVT( tileHref, size, (err, data) => checkData(err, srcKey, data) );
+        //readMVT( tileHref, size, (err, data) => checkData(err, srcKey, data) );
+        let readCallback = (err, data) => checkData(err, srcKey, data);
+        let readPayload = { href: tileHref, size: size };
+        reader(readPayload, readCallback);
       } else if (src.type === "raster") {
         loadImage( tileHref, (err, data) => checkData(err, srcKey, data) );
       }

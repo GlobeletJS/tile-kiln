@@ -1,0 +1,37 @@
+<html>
+
+  <head>
+    <title>tilekiln - beta</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="icon" type="image/png" href="splitearth_v12b.png">
+
+    <link rel="stylesheet" type="text/css" href="styles.css">
+
+    <script src="main.min.js"></script>
+  </head>
+
+  <body onload="workers.main()">
+    <div class="leftSide">
+      <p id="zxy">Tile coordinates</p>
+      <div id="map">
+        <div id="topleft">
+          <button id="zoomOut" class="nav">-</button>
+          <button id="zoomIn" class="nav">+</button>
+        </div>
+        <button id="up" class="nav">^</button>
+        <button id="left" class="nav">&lt;</button>
+        <button id="right" class="nav">&gt;</button>
+        <button id="down" class="nav">v</button>
+      </div>
+      <p>
+        <button id="toggleBurwell">Toggle Burwell Polygon Visibility</button>
+        <button id="toggleLabels">Toggle Label Visibility</button>
+      </p>
+    </div>
+
+    <div id="info">Feature info will appear here</div>
+  </body>
+
+</html>

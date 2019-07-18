@@ -62,4 +62,16 @@ export default [{
     format: 'iife',
     name: 'macrostrat',
   },
+}, {
+  input: 'workers/main.js',
+  plugins: [
+    resolve(),
+    commonjs(),
+    json(),
+  ],
+  output: {
+    file: 'workers/main.min.js',
+    format: 'iife',
+    name: 'workers',
+  },
 }];

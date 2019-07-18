@@ -1,4 +1,5 @@
 import { loadStyle } from "./style.js";
+import { initWorker } from "./boss.js";
 import { initTileFactory } from "./tile.js";
 import { initRenderer } from "./rendering/renderer.js";
 
@@ -30,6 +31,9 @@ export function init(params) {
     ready: false,
   };
 
+  // Initialize a worker thread to read and parse MVT tiles
+  const readThread = initWorker("./worker.bundle.js");
+
   // Get the style info
   loadStyle(styleURL, mbToken, setup);
 
@@ -59,8 +63,10 @@ export function init(params) {
       return { name, visible: true };
     });
 
-    tileFactory = initTileFactory(canvSize, styleDoc.sources, styleGroups);
-    renderer = initRenderer(canvSize, styleDoc.layers, styleGroups, styleDoc.sprite);
+    tileFactory = initTileFactory(canvSize, styleDoc.sources, 
+      styleGroups, readThread.startTask);
+    renderer = initRenderer(canvSize, styleDoc.layers, 
+      styleGroups, styleDoc.sprite);
 
     // Update api
     // TODO: we could initialize renderer without styles, then send it the

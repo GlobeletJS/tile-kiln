@@ -3,7 +3,7 @@ import commonjs from 'rollup-plugin-commonjs'; // Yuck... needed for Mapbox modu
 import { glsl } from "./glsl-plugin.js";
 import pkg from "../package.json";
 
-export default {
+export default [{
   input: 'src/main.js',
   plugins: [
     glsl(),
@@ -16,4 +16,15 @@ export default {
     format: 'esm',
     name: pkg.name
   }
-};
+}, {
+  input: 'src/worker.js',
+  plugins: [
+    resolve(),
+    commonjs(),
+  ],
+  output: {
+    file: 'dist/worker.bundle.js',
+    format: 'esm',
+    name: pkg.name,
+  },
+}];
