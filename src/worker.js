@@ -1,6 +1,4 @@
-import { xhrGet } from "./xhrGet.js";
-import { Pbf as Protobuf } from 'pbf';
-import { VectorTile } from 'vector-tile-js';
+import { readMVT } from "./read.js";
 
 onmessage = function(msgEvent) {
   // The message DATA as sent by the parent thread is now a property 
@@ -11,46 +9,65 @@ onmessage = function(msgEvent) {
   readMVT(payload.href, payload.size, returnResult);
 
   function returnResult(err, result) {
+    if (result["units"] !== undefined) {
+      // Merge Macrostrat polygons with the same .id
+      result["units"] = mergeMacrostrat(result["units"]);
+    }
     postMessage({ id, err, payload: result });
   }
 }
 
-function readMVT(dataHref, size, callback) {
-  // Input dataHref is the path to a file containing a Mapbox Vector Tile
+function mergeMacrostrat(layer) {
+  // Make sure this is really Macrostrat data
+  let testProps = layer.features[0].properties;
+  let isMacrostrat = testProps["map_id"] !== undefined &&
+    testProps["legend_id"] !== undefined;
+  if (!isMacrostrat) return layer;
 
-  // Request the data
-  xhrGet(dataHref, "arraybuffer", parseMVT);
+  // Sort the polygons
+  const polys = layer.features.map( feature => {
+    delete feature.properties["map_id"];
+    feature.id = feature.properties["legend_id"];
+    return feature;
+  }).sort( (a, b) => (a.id < b.id) ? -1 : 1 );
 
-  function parseMVT(err, data) {
-    if (err) return (err.type === 404)
-      ? callback(null, {})           // Tile out of bounds? Don't rock the boat
-      : callback(err.message, data); // Other problems... return the whole mess
+  // Combine polygons with the same .id
+  const multiPolys = [];
+  let numPolys = polys.length;
+  let i = 0;
+  while (i < numPolys) {
+    let id = polys[i].id;
 
-    //console.time('parseMVT');
-    const pbuffer = new Protobuf( new Uint8Array(data) );
-    const tile = new VectorTile(pbuffer);
-    const jsonLayers = mvtToJSON(tile, size);
-    //console.timeEnd('parseMVT');
+    // Set the properties for this .id
+    let feature = {
+      type: "Feature",
+      properties: polys[i].properties,
+      id: id,
+    };
 
-    callback(null, jsonLayers);
+    // Collect the geometries of all polygons with this .id
+    let coords = [];
+    while (i < numPolys && polys[i].id === id) {
+      let geom = polys[i].geometry;
+      if (geom.type === "Polygon") {
+        coords.push(geom.coordinates);
+      } else if (geom.type === "MultiPolygon") {
+        geom.coordinates.forEach( coord => coords.push(coord) );
+      }
+      i++;
+    }
+
+    // Append the combined geometry to the current feature
+    feature.geometry = { type: "MultiPolygon", coordinates: coords };
+
+    // Append this feature to the new feature set
+    multiPolys.push(feature);
   }
-}
 
-function mvtToJSON(tile, size) {
-  // tile.layers is an object (not array!). In Mapbox Streets, it is an
-  // object of { name: layer, } pairs, where name = layer.name. 
-  // But this is not mentioned in the spec! So we use layer.name for safety
-  const jsonLayers = {};
-  Object.values(tile.layers).forEach(layer => {
-      jsonLayers[layer.name] = layerToJSON(layer, size);
-  });
-  return jsonLayers;
-}
+  const newCollection = {
+    type: "FeatureCollection",
+    features: multiPolys
+  };
 
-function layerToJSON(layer, size) {
-  const features = [];
-  for (let i = 0; i < layer.length; ++i) {
-    features.push( layer.feature(i).toGeoJSON(size) );
-  }
-  return { type: "FeatureCollection", features: features };
+  return newCollection;
 }

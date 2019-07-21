@@ -1358,29 +1358,16 @@ function readTile(tag, layers, pbf) {
   }
 }
 
-onmessage = function(msgEvent) {
-  // The message DATA as sent by the parent thread is now a property 
-  // of the message EVENT. See
-  // https://developer.mozilla.org/en-US/docs/Web/API/MessageEvent
-  const {id, payload} = msgEvent.data;
-
-  readMVT(payload.href, payload.size, returnResult);
-
-  function returnResult(err, result) {
-    postMessage({ id, err, payload: result });
-  }
-};
-
 function readMVT(dataHref, size, callback) {
   // Input dataHref is the path to a file containing a Mapbox Vector Tile
 
   // Request the data
-  xhrGet(dataHref, "arraybuffer", parseMVT);
+  var req = xhrGet(dataHref, "arraybuffer", parseMVT);
 
   function parseMVT(err, data) {
     if (err) return (err.type === 404)
       ? callback(null, {})           // Tile out of bounds? Don't rock the boat
-      : callback(err.message, data); // Other problems... return the whole mess
+      : callback(err.message, data); // Other problems... Return the whole mess
 
     //console.time('parseMVT');
     const pbuffer = new Pbf( new Uint8Array(data) );
@@ -1409,4 +1396,76 @@ function layerToJSON(layer, size) {
     features.push( layer.feature(i).toGeoJSON(size) );
   }
   return { type: "FeatureCollection", features: features };
+}
+
+onmessage = function(msgEvent) {
+  // The message DATA as sent by the parent thread is now a property 
+  // of the message EVENT. See
+  // https://developer.mozilla.org/en-US/docs/Web/API/MessageEvent
+  const {id, payload} = msgEvent.data;
+
+  readMVT(payload.href, payload.size, returnResult);
+
+  function returnResult(err, result) {
+    if (result["units"] !== undefined) {
+      // Merge Macrostrat polygons with the same .id
+      result["units"] = mergeMacrostrat(result["units"]);
+    }
+    postMessage({ id, err, payload: result });
+  }
+};
+
+function mergeMacrostrat(layer) {
+  // Make sure this is really Macrostrat data
+  let testProps = layer.features[0].properties;
+  let isMacrostrat = testProps["map_id"] !== undefined &&
+    testProps["legend_id"] !== undefined;
+  if (!isMacrostrat) return layer;
+
+  // Sort the polygons
+  const polys = layer.features.map( feature => {
+    delete feature.properties["map_id"];
+    feature.id = feature.properties["legend_id"];
+    return feature;
+  }).sort( (a, b) => (a.id < b.id) ? -1 : 1 );
+
+  // Combine polygons with the same .id
+  const multiPolys = [];
+  let numPolys = polys.length;
+  let i = 0;
+  while (i < numPolys) {
+    let id = polys[i].id;
+
+    // Set the properties for this .id
+    let feature = {
+      type: "Feature",
+      properties: polys[i].properties,
+      id: id,
+    };
+
+    // Collect the geometries of all polygons with this .id
+    let coords = [];
+    while (i < numPolys && polys[i].id === id) {
+      let geom = polys[i].geometry;
+      if (geom.type === "Polygon") {
+        coords.push(geom.coordinates);
+      } else if (geom.type === "MultiPolygon") {
+        geom.coordinates.forEach( coord => coords.push(coord) );
+      }
+      i++;
+    }
+
+    // Append the combined geometry to the current feature
+    feature.geometry = { type: "MultiPolygon", coordinates: coords };
+
+    // Append this feature to the new feature set
+    multiPolys.push(feature);
+  }
+
+  const newCollection = {
+    type: "FeatureCollection",
+    features: multiPolys
+  };
+
+  return newCollection;
 }

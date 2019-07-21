@@ -13,11 +13,11 @@ export function readMVT(dataHref, size, callback) {
       ? callback(null, {})           // Tile out of bounds? Don't rock the boat
       : callback(err.message, data); // Other problems... Return the whole mess
 
-    console.time('parseMVT');
+    //console.time('parseMVT');
     const pbuffer = new Protobuf( new Uint8Array(data) );
     const tile = new VectorTile(pbuffer);
     const jsonLayers = mvtToJSON(tile, size);
-    console.timeEnd('parseMVT');
+    //console.timeEnd('parseMVT');
 
     callback(null, jsonLayers);
   }
