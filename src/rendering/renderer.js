@@ -1,6 +1,6 @@
 import { getFeatures } from "./getFeatures.js";
 import { initRoller } from "./roller.js";
-import { initBrush } from "./brush.js";
+import { brush } from "./brush.js";
 import { initLabeler } from "./labeler.js";
 
 export function initRenderer(canvSize, styleLayers, styleGroups, sprite, chains) {
@@ -11,9 +11,8 @@ export function initRenderer(canvSize, styleLayers, styleGroups, sprite, chains)
   //   "tilekiln-group" property of each layer
   // Input sprite (if defined) is an object with image and meta properties
 
-  // Initialize roller and brush, to paint single layers onto the canvas
+  // Initialize roller, to paint single layers onto the canvas
   const roller = initRoller(canvSize);
-  const brush = initBrush();
   // Initialize labeler: draws text labels and "sprite" icons
   const labeler = initLabeler(sprite);
 
