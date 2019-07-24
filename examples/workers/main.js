@@ -93,7 +93,10 @@ export function main() {
     } else {
       tileMaker.hideGroup("burwell");
     }
-    tileMaker.composite(currentTile);
+    currentTile.rendered = false;
+    clickTime = performance.now();
+    requestActive = true;
+    tileMaker.redraw(currentTile, displayTile, true);
   }
 
   function toggleLabels() {
@@ -103,7 +106,10 @@ export function main() {
     } else {
       tileMaker.hideGroup("labels");
     }
-    tileMaker.composite(currentTile);
+    currentTile.rendered = false;
+    clickTime = performance.now();
+    requestActive = true;
+    tileMaker.redraw(currentTile, displayTile, true);
   }
 
   function initHandlers() {

@@ -59,12 +59,17 @@ export function main() {
         highlighter.filter[2] = feature.properties.title.toString();
       }
       //tileMaker.redraw(currentTile);
-      tileMaker.drawGroup(currentTile, "highlight");
-      tileMaker.composite(currentTile);
+      invalidateGroup(currentTile, "highlight");
+      if (!currentTile.rendering) tileMaker.redraw(currentTile);
       display.context.drawImage(currentTile.img, 0, 0);
     }
 
     requestAnimationFrame(checkRender);
+  }
+
+  function invalidateGroup(tile, group) {
+    tile.laminae[group].rendered = false;
+    tile.rendered = false;
   }
 
   function update() {
@@ -78,45 +83,7 @@ export function main() {
     title.innerHTML = "z/x/y = " + tzxy[0] + "/" + tzxy[1] + "/" + tzxy[2];
   }
 
-  function toggleLines() {
-    linesVisible = !linesVisible;
-    var visText = (linesVisible)
-      ? "visible"
-      : "none";
-
-    tileMaker.style.layers.forEach(setLineVisibility);
-
-    tileMaker.redraw(currentTile, displayTile);
-
-    function setLineVisibility(layer) {
-      if (layer.type !== "line") return;
-      layer.layout.visibility = visText;
-    }
-  }
-
-  function toggleHillshade() {
-    hillshadeVisible = !hillshadeVisible;
-    var visText = (hillshadeVisible)
-      ? "visible"
-      : "none";
-
-    tileMaker.style.layers.forEach(setHillshadeVisibility);
-
-    tileMaker.redraw(currentTile, displayTile);
-
-    function setHillshadeVisibility(layer) {
-      if (layer["source-layer"] !== "hillshade") return;
-      layer.layout.visibility = visText;
-    }
-  }
-
   function initHandlers() {
-    const lineToggle = document.getElementById("toggleLines");
-    lineToggle.addEventListener("click", toggleLines, false);
-
-    const hillshadeToggle = document.getElementById("toggleHillshade");
-    hillshadeToggle.addEventListener("click", toggleHillshade, false);
-
     const left = document.getElementById("left");
     const right = document.getElementById("right");
     const up = document.getElementById("up");

@@ -294,6 +294,7 @@ function initTileFactory(size, sources, styleGroups, reader) {
       loaded: false,
       img: baseLamina.img,
       ctx: baseLamina.ctx,
+      rendering: baseLamina.rendering,
       rendered: baseLamina.rendered,
       laminae: {},
     };
@@ -342,7 +343,7 @@ function initLamina(size) {
   img.height = size;
   let ctx = img.getContext("2d");
   ctx.save(); // Save default styles
-  return { img, ctx, rendered: false };
+  return { img, ctx, rendering: false, rendered: false };
 }
 
 function tileURL(endpoint, z, x, y) {
@@ -1759,7 +1760,6 @@ function initRenderer(canvSize, styleLayers, styleGroups, sprite, chains) {
         if (!group.visible) return;
         tile.ctx.drawImage(tile.laminae[group.name].img, 0, 0);
       });
-      tile.rendered = true;
     };
   } else {
     // Only one group of style layers. Render directly to the main canvas
@@ -1775,9 +1775,10 @@ function initRenderer(canvSize, styleLayers, styleGroups, sprite, chains) {
 
   function drawGroup(tile, groupName = "none", callback = () => undefined) {
     if (!styles[groupName]) return callback(null, tile);
+    let lamina = getLamina(tile, groupName);
+    if (lamina.rendered) return callback(null, tile);
 
     // Clear rendering context and bounding boxes
-    let lamina = getLamina(tile, groupName);
     lamina.ctx.clearRect(0, 0, canvSize, canvSize);
     labeler.clearBoxes();
 
@@ -1914,10 +1915,8 @@ function init(params) {
   const api = { // Initialize properties, update when styles load
     style: {},    // WARNING: directly modifiable from calling program
     create: () => undefined,
-    drawGroup: (group) => undefined,
     hideGroup: (name) => setGroupVisibility(name, false),
     showGroup: (name) => setGroupVisibility(name, true),
-    composite: () => undefined,
     redraw: () => undefined,
     groups: [],
     ready: false,
@@ -1968,11 +1967,10 @@ function init(params) {
     // styles when ready. This could avoid the need to rewrite the API.
     api.style = styleDoc;
     api.create = create;
-    api.drawGroup = renderer.drawGroup;
-    api.composite = renderer.composite;
+
     api.redraw = drawAll;
-    api.ready = true;
     api.groups = groupNames;
+    api.ready = true;
 
     return callback(null, api);
   }
@@ -1992,10 +1990,19 @@ function init(params) {
   }
 
   function drawAll(tile, callback = () => true, reportTime) {
+    // Flag this tile as in the process of rendering
+    tile.rendering = true;
+
+    //var numToDo = styleGroups.length;
+    //styleGroups.forEach(group => {
+    //  if (!group.visible) return;
+    //  let cb = (err, tile) => checkAll(err, tile, group.name);
+    //  renderer.drawGroup(tile, group.name, cb);
+    //});
+
     // Make a chain of functions to draw each group
-    const drawCalls = styleGroups.map(group => {
-      return chains.cbInserter( makeDrawCall(group) );
-    });
+    const drawCalls = styleGroups.filter( group => group.visible )
+      .map( group => chains.cbInserter(makeDrawCall(group)) );
 
     function makeDrawCall(group) {
       return (cb) => {
@@ -2012,6 +2019,10 @@ function init(params) {
 
     function putTogether() {
       renderer.composite(tile);
+
+      tile.rendered = true;
+      tile.rendering = false;
+
       if (!reportTime) return callback(null, tile);
       t2 = performance.now();
       return callback(null, tile, t2 - t1, t1 - t0);

@@ -34,7 +34,6 @@ export function initRenderer(canvSize, styleLayers, styleGroups, sprite, chains)
         if (!group.visible) return;
         tile.ctx.drawImage(tile.laminae[group.name].img, 0, 0);
       });
-      tile.rendered = true;
     };
   } else {
     // Only one group of style layers. Render directly to the main canvas
@@ -50,9 +49,10 @@ export function initRenderer(canvSize, styleLayers, styleGroups, sprite, chains)
 
   function drawGroup(tile, groupName = "none", callback = () => undefined) {
     if (!styles[groupName]) return callback(null, tile);
+    let lamina = getLamina(tile, groupName);
+    if (lamina.rendered) return callback(null, tile);
 
     // Clear rendering context and bounding boxes
-    let lamina = getLamina(tile, groupName);
     lamina.ctx.clearRect(0, 0, canvSize, canvSize);
     labeler.clearBoxes();
 

@@ -23,10 +23,8 @@ export function init(params) {
   const api = { // Initialize properties, update when styles load
     style: {},    // WARNING: directly modifiable from calling program
     create: () => undefined,
-    drawGroup: (group) => undefined,
     hideGroup: (name) => setGroupVisibility(name, false),
     showGroup: (name) => setGroupVisibility(name, true),
-    composite: () => undefined,
     redraw: () => undefined,
     groups: [],
     ready: false,
@@ -77,11 +75,10 @@ export function init(params) {
     // styles when ready. This could avoid the need to rewrite the API.
     api.style = styleDoc;
     api.create = create;
-    api.drawGroup = renderer.drawGroup;
-    api.composite = renderer.composite;
+
     api.redraw = drawAll;
-    api.ready = true;
     api.groups = groupNames;
+    api.ready = true;
 
     return callback(null, api);
   }
@@ -101,10 +98,19 @@ export function init(params) {
   }
 
   function drawAll(tile, callback = () => true, reportTime) {
+    // Flag this tile as in the process of rendering
+    tile.rendering = true;
+
+    //var numToDo = styleGroups.length;
+    //styleGroups.forEach(group => {
+    //  if (!group.visible) return;
+    //  let cb = (err, tile) => checkAll(err, tile, group.name);
+    //  renderer.drawGroup(tile, group.name, cb);
+    //});
+
     // Make a chain of functions to draw each group
-    const drawCalls = styleGroups.map(group => {
-      return chains.cbInserter( makeDrawCall(group) );
-    });
+    const drawCalls = styleGroups.filter( group => group.visible )
+      .map( group => chains.cbInserter(makeDrawCall(group)) );
 
     function makeDrawCall(group) {
       return (cb) => {
@@ -121,6 +127,10 @@ export function init(params) {
 
     function putTogether() {
       renderer.composite(tile);
+
+      tile.rendered = true;
+      tile.rendering = false;
+
       if (!reportTime) return callback(null, tile);
       t2 = performance.now();
       return callback(null, tile, t2 - t1, t1 - t0);
@@ -135,20 +145,9 @@ export function init(params) {
     }
 
     function checkAll(err, tile, groupName) {
-      // TODO: if we render directly to the tile's canvas,
-      // we wouldn't have to worry about groups rendering in order,
-      // and we could still use this simple counting flow
-      if (err) return callback(err);
-      if (reportTime) {
-        let dt = (performance.now() - t0).toFixed(1);
-        callback("check: " + groupName + ", dt = " + dt + "ms");
-      }
+      check(err, tile, groupName);
       if (--numToDo > 0) return;
-
-      renderer.composite(tile);
-      if (!reportTime) return callback(null, tile);
-      t2 = performance.now();
-      return callback(null, tile, t2 - t1, t1 - t0);
+      return putTogether();
     }
   }
 }

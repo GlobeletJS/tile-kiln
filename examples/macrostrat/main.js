@@ -88,7 +88,8 @@ export function main() {
     } else {
       tileMaker.hideGroup("burwell");
     }
-    tileMaker.composite(currentTile);
+    currentTile.rendered = false;
+    tileMaker.redraw(currentTile);
   }
 
   function toggleLabels() {
@@ -98,7 +99,8 @@ export function main() {
     } else {
       tileMaker.hideGroup("labels");
     }
-    tileMaker.composite(currentTile);
+    currentTile.rendered = false;
+    tileMaker.redraw(currentTile);
   }
 
   function initHandlers() {

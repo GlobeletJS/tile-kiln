@@ -22,6 +22,7 @@ export function initTileFactory(size, sources, styleGroups, reader) {
       loaded: false,
       img: baseLamina.img,
       ctx: baseLamina.ctx,
+      rendering: baseLamina.rendering,
       rendered: baseLamina.rendered,
       laminae: {},
     };
@@ -70,7 +71,7 @@ function initLamina(size) {
   img.height = size;
   let ctx = img.getContext("2d");
   ctx.save(); // Save default styles
-  return { img, ctx, rendered: false };
+  return { img, ctx, rendering: false, rendered: false };
 }
 
 function tileURL(endpoint, z, x, y) {

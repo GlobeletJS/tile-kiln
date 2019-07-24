@@ -52,6 +52,7 @@ export function main() {
 
     tileMaker.style.layers.forEach(setLineVisibility);
 
+    currentTile.rendered = false;
     tileMaker.redraw(currentTile, displayTile);
 
     function setLineVisibility(layer) {
@@ -68,6 +69,7 @@ export function main() {
 
     tileMaker.style.layers.forEach(setHillshadeVisibility);
 
+    currentTile.rendered = false;
     tileMaker.redraw(currentTile, displayTile);
 
     function setHillshadeVisibility(layer) {
