@@ -2010,7 +2010,7 @@ function init(params) {
     // Execute the chain, with putTogether as the final callback
     chains.callInOrder( drawCalls, () => putTogether(tile) );
 
-    function putTogether(tile) {
+    function putTogether() {
       renderer.composite(tile);
       if (!reportTime) return callback(null, tile);
       t2 = performance.now();
