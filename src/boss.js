@@ -25,12 +25,19 @@ export function initWorker(codeHref) {
   }
 
   function handleMsg(msgEvent) {
+    //var t1 = performance.now();
     const { id, err, payload } = msgEvent.data;
+
+    //var readTime = (performance.now() - t1).toFixed(1);
+    //console.log("handleMsg: read time = " + readTime + "ms");
 
     const callback = callbacks[id];
     if (callback) callback(err, payload);
 
     delete callbacks[id];
     activeTasks --;
+
+    //var totalTime = (performance.now() - t1).toFixed(1);
+    //console.log("handleMsg: total time = " + totalTime + "ms");
   }
 }

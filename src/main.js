@@ -2,6 +2,7 @@ import { loadStyle } from "./style.js";
 import { initWorker } from "./boss.js";
 import { initTileFactory } from "./tile.js";
 import { initRenderer } from "./rendering/renderer.js";
+import { initChainer } from "./chains.js";
 
 export function init(params) {
   // Process parameters, substituting defaults as needed
@@ -11,7 +12,7 @@ export function init(params) {
   var callback = params.callback || ( () => undefined );
 
   // Declare some variables & methods that will be defined inside a callback
-  var groupNames, tileFactory, renderer, t1, t2;
+  var groupNames, tileFactory, renderer, t0, t1, t2;
   var styleGroups = [];
 
   function setGroupVisibility(name, visibility) {
@@ -33,6 +34,9 @@ export function init(params) {
 
   // Initialize a worker thread to read and parse MVT tiles
   const readThread = initWorker("./worker.bundle.js");
+
+  // Initialize handler for chaining functions asynchronously
+  const chains = initChainer();
 
   // Get the style info
   loadStyle(styleURL, mbToken, setup);
@@ -66,7 +70,7 @@ export function init(params) {
     tileFactory = initTileFactory(canvSize, styleDoc.sources, 
       styleGroups, readThread.startTask);
     renderer = initRenderer(canvSize, styleDoc.layers, 
-      styleGroups, styleDoc.sprite);
+      styleGroups, styleDoc.sprite, chains);
 
     // Update api
     // TODO: we could initialize renderer without styles, then send it the
@@ -83,21 +87,68 @@ export function init(params) {
   }
 
   function create(z, x, y, cb = () => undefined, reportTime) {
+    if (reportTime) t0 = performance.now();
     var tile = tileFactory(z, x, y, render);
     function render(err) {
       if (err) cb(err);
-      if (reportTime) t1 = performance.now();
-      drawAll(tile);
-      if (!reportTime) return cb(null, tile);
-      t2 = performance.now();
-      return cb(null, tile, t2 - t1);
+      if (reportTime) {
+        t1 = performance.now();
+        cb("Calling drawAll");
+      }
+      drawAll(tile, cb, reportTime);
     }
     return tile;
   }
 
-  function drawAll(tile, callback = () => true) {
-    styleGroups.forEach( group => renderer.drawGroup(tile, group.name) );
-    renderer.composite(tile);
-    callback(null, tile);
+  function drawAll(tile, callback = () => true, reportTime) {
+    // Make a chain of functions to draw each group
+    const drawCalls = styleGroups.map(group => {
+      return chains.cbInserter( makeDrawCall(group) );
+    });
+
+    function makeDrawCall(group) {
+      return (cb) => {
+        let checkCb = (err, tile) => {
+          check(err, tile, group.name);
+          cb();
+        };
+        renderer.drawGroup(tile, group.name, checkCb);
+      };
+    }
+
+    // Execute the chain, with putTogether as the final callback
+    chains.callInOrder( drawCalls, () => putTogether(tile) );
+
+    function putTogether(tile) {
+      renderer.composite(tile);
+      if (!reportTime) return callback(null, tile);
+      t2 = performance.now();
+      return callback(null, tile, t2 - t1, t1 - t0);
+    }
+
+    function check(err, tile, groupName) {
+      if (err) return callback(err);
+      if (reportTime) {
+        let dt = (performance.now() - t0).toFixed(1);
+        callback("check: " + groupName + ", dt = " + dt + "ms");
+      }
+    }
+
+    function checkAll(err, tile, groupName) {
+      // TODO: if we render directly to the tile's canvas,
+      // we wouldn't have to worry about groups rendering in order,
+      // and we could still use this simple counting flow
+      if (err) return callback(err);
+      if (reportTime) {
+        let dt = (performance.now() - t0).toFixed(1);
+        callback("check: " + groupName + ", dt = " + dt + "ms");
+      }
+      if (--numToDo > 0) return;
+
+      renderer.composite(tile);
+      if (!reportTime) return callback(null, tile);
+      t2 = performance.now();
+      return callback(null, tile, t2 - t1, t1 - t0);
+    }
   }
 }

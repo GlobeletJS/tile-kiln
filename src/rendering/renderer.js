@@ -3,7 +3,7 @@ import { initRoller } from "./roller.js";
 import { initBrush } from "./brush.js";
 import { initLabeler } from "./labeler.js";
 
-export function initRenderer(canvSize, styleLayers, styleGroups, sprite) {
+export function initRenderer(canvSize, styleLayers, styleGroups, sprite, chains) {
   // Input canvSize is an integer, for the pixel size of the (square) tiles
   // Input styleLayers points to the .layers property of a Mapbox style document
   //   Specification: https://docs.mapbox.com/mapbox-gl-js/style-spec/
@@ -65,16 +65,25 @@ export function initRenderer(canvSize, styleLayers, styleGroups, sprite) {
     ctx.clearRect(0, 0, canvSize, canvSize);
     labeler.clearBoxes();
 
-    // Draw the layers
-    styles[groupName].forEach( style => drawLayer(style, tile.z, tile.sources) );
+    //styles[groupName].forEach( style => drawLayer(style, tile.z, tile.sources) );
 
-    // Copy the rendered image to the tile
-    let lamina = getLamina(tile, groupName);
-    lamina.ctx.clearRect(0, 0, canvSize, canvSize);
-    lamina.ctx.drawImage(canvas, 0, 0);
-    
-    lamina.rendered = true;
-    return callback(null, tile);
+    // Draw the layers: asynchronously, but in order
+    // Create a chain of functions, one for each layer.
+    const drawCalls = styles[groupName].map(style => {
+      return chains.cbWrapper( () => drawLayer(style, tile.z, tile.sources) );
+    });
+    // Execute the chain, with copyResult as the final callback
+    chains.callInOrder(drawCalls, copyResult);
+
+    function copyResult() {
+      // Copy the rendered image to the tile
+      let lamina = getLamina(tile, groupName);
+      lamina.ctx.clearRect(0, 0, canvSize, canvSize);
+      lamina.ctx.drawImage(canvas, 0, 0);
+
+      lamina.rendered = true;
+      return callback(null, tile);
+    }
   }
 
   function drawLayer(style, zoom, sources) {

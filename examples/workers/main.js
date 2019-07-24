@@ -31,6 +31,10 @@ export function main() {
     callback: setup,
   });
 
+  // Declare time tracking variables
+  var clickTime, displayTime, dt, requestActive;
+  var framesSinceRedraw = 999;
+
   // Get first tile, setup interaction
   function setup(err, api) {
     if (err) return console.log(err);
@@ -44,21 +48,42 @@ export function main() {
       display.context.clearRect(0, 0, 512, 512);
       display.context.drawImage(currentTile.img, 0, 0);
     }
+    if (requestActive) {
+      dt = (time - clickTime).toFixed(1);
+      info.innerHTML += "<br>Animation frame: " + dt + "ms";
+    } else if (framesSinceRedraw < 3) {
+      dt = (time - clickTime).toFixed(1);
+      info.innerHTML += "<br>Animation frame: " + dt + "ms";
+      framesSinceRedraw++;
+    }
 
     requestAnimationFrame(checkRender);
   }
 
   function update() {
+    // Clear printout, start timer
+    info.innerHTML = "";
+    clickTime = performance.now();
+    requestActive = true;
     var checkTime = true;
     nextTile = tileMaker.create(tzxy[0], tzxy[1], tzxy[2], displayTile, checkTime);
   }
-  function displayTile(err, tile, time) {
-    if (err) return console.log(err);
+  function displayTile(err, tile, renderTime, prepTime) {
+    if (err) {
+      info.innerHTML += "<br>" + err;
+      return;
+      //return console.log(err);
+    }
     currentTile = nextTile;
     // Copy the renderer canvas onto our display canvas
     //display.context.drawImage(tile.img, 0, 0); // Move to animation loop
     title.innerHTML = "z/x/y = " + tzxy[0] + "/" + tzxy[1] + "/" + tzxy[2];
-    info.innerHTML = "Render time: " + Math.round(time) + "ms";
+    info.innerHTML += "<br>Prep time: " + Math.round(prepTime) + "ms";
+    info.innerHTML += "<br>Render time: " + Math.round(renderTime) + "ms";
+    displayTime = Math.round(performance.now() - clickTime);
+    info.innerHTML += "<br>Total delay: " + displayTime + "ms";
+    requestActive = false;
+    framesSinceRedraw = 0;
   }
 
   function toggleBurwell() {

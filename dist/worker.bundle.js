@@ -1409,9 +1409,12 @@ onmessage = function(msgEvent) {
   function returnResult(err, result) {
     if (result["units"] !== undefined) {
       // Merge Macrostrat polygons with the same .id
+      //console.time('mergeMacrostrat');
       result["units"] = mergeMacrostrat(result["units"]);
+      //console.timeEnd('mergeMacrostrat');
     }
-    postMessage({ id, err, payload: result });
+    var msg = { id, err, payload: result };
+    postMessage(msg);
   }
 };
 
