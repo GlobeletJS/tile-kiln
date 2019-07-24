@@ -68,11 +68,9 @@ function initLamina(size) {
   let img = document.createElement("canvas");
   img.width = size;
   img.height = size;
-  return { 
-    img, 
-    ctx: img.getContext("2d"),
-    rendered: false,
-  };
+  let ctx = img.getContext("2d");
+  ctx.save(); // Save default styles
+  return { img, ctx, rendered: false };
 }
 
 function tileURL(endpoint, z, x, y) {

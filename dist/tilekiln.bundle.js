@@ -340,11 +340,9 @@ function initLamina(size) {
   let img = document.createElement("canvas");
   img.width = size;
   img.height = size;
-  return { 
-    img, 
-    ctx: img.getContext("2d"),
-    rendered: false,
-  };
+  let ctx = img.getContext("2d");
+  ctx.save(); // Save default styles
+  return { img, ctx, rendered: false };
 }
 
 function tileURL(endpoint, z, x, y) {
@@ -748,23 +746,21 @@ function interpColor(c0, c1, t) {
 }
 
 // Renders layers that cover the whole tile (like painting with a roller)
-function initRoller(ctx) {
-  // Input ctx is a Canvas 2D rendering context
-  const canvSize = ctx.canvas.width;
+function initRoller(canvSize) {
 
   return {
     fillBackground,
     drawRaster,
   };
 
-  function fillBackground(style, zoom) {
+  function fillBackground(ctx, style, zoom) {
     // Cover the tile with a bucket of paint
     ctx.fillStyle = evalStyle(style.paint["background-color"], zoom);
     ctx.globalAlpha = evalStyle(style.paint["background-opacity"], zoom);
     ctx.fillRect(0, 0, canvSize, canvSize);
   }
 
-  function drawRaster(style, zoom, image) {
+  function drawRaster(ctx, style, zoom, image) {
     // Cover the tile with a prettily patterned wallpaper
     var paint = style.paint;
     if (paint !== undefined) {
@@ -1314,15 +1310,15 @@ function index(projection, context) {
 }
 
 // Renders layers made of points, lines, polygons (like painting with a brush)
-function initBrush(ctx) {
-  // Input ctx is a Canvas 2D rendering context
+function initBrush() {
 
-  // Initialize the D3 path generator. 
-  // First param is the projection. Keep the data's native coordinates for now
-  const path = index(null, ctx);
-  const setRadius = (radius) => { if (radius) path.pointRadius(radius); };
+  // TODO: Why bother to init?
+  return function(ctx, style, zoom, data) {
 
-  return function(style, zoom, data) {
+    // Initialize the D3 path generator. 
+    // First param is the projection. Keep the data's native coordinates for now
+    const path = index(null, ctx);
+
     var layout = style.layout;
     var paint = style.paint;
     var method;
@@ -1333,6 +1329,7 @@ function initBrush(ctx) {
     // For data-dependent styles, store the state FUNCTIONS in dataDependencies
     switch (style.type) {
       case "circle":
+        let setRadius = (radius) => { if (radius) path.pointRadius(radius); };
         setState("", paint["circle-radius"], setRadius);
         setState("fillStyle", paint["circle-color"]);
         setState("globalAlpha", paint["circle-opacity"]);
@@ -1369,7 +1366,7 @@ function initBrush(ctx) {
     }
 
     // Draw the features in the data
-    draw(data, dataDependencies, zoom, method);
+    draw(ctx, path, data, dataDependencies, zoom, method);
     return;
 
     function setState(option, val, stateFunc) { // Nested for access to zoom
@@ -1382,10 +1379,12 @@ function initBrush(ctx) {
     }
   }
 
-  function draw(data, dataDependencies, zoom, method) {
-    if (dataDependencies.length == 0) return drawPath(data, method);
+  // TODO: from here down could be un-nested?
 
-    sortAndDraw(data, dataDependencies, zoom, method);
+  function draw(ctx, path, data, dataDependencies, zoom, method) {
+    if (dataDependencies.length == 0) return drawPath(ctx, path, data, method);
+
+    sortAndDraw(ctx, path, data, dataDependencies, zoom, method);
     //data.features.forEach(feature => {
     //  dataDependencies.forEach( dep => {
     //    dep.stateFunc( dep.styleFunc(zoom, feature) )
@@ -1394,13 +1393,13 @@ function initBrush(ctx) {
     //});
   }
 
-  function drawPath(data, method) {
+  function drawPath(ctx, path, data, method) {
     ctx.beginPath();
     path(data);
     ctx[method]();
   }
 
-  function sortAndDraw(data, dataDependencies, zoom, method) {
+  function sortAndDraw(ctx, path, data, dataDependencies, zoom, method) {
     // Build an array of features, style values, and a sortable id
     let features = data.features.map( feature => {
       let vals = dataDependencies.map( dep => dep.styleFunc(zoom, feature) );
@@ -1675,7 +1674,7 @@ function initIconLabeler(ctx, style, zoom, sprite) {
   }
 }
 
-function initLabeler(ctx, sprite) {
+function initLabeler(sprite) {
   var boxes = [];
 
   return {
@@ -1687,7 +1686,7 @@ function initLabeler(ctx, sprite) {
     boxes = [];
   }
 
-  function draw(style, zoom, data) {
+  function draw(ctx, style, zoom, data) {
     var layout = style.layout;
     if (layout["symbol-placement"] === "line") return;
 
@@ -1737,20 +1736,11 @@ function initRenderer(canvSize, styleLayers, styleGroups, sprite, chains) {
   //   "tilekiln-group" property of each layer
   // Input sprite (if defined) is an object with image and meta properties
 
-  // Create canvas for rendering, set drawingbuffer size
-  const canvas = document.createElement("canvas");
-  canvas.width = canvSize;
-  canvas.height = canvSize;
-
-  // Initialize rendering context and save default styles
-  const ctx = canvas.getContext("2d");
-  ctx.save();
-
   // Initialize roller and brush, to paint single layers onto the canvas
-  const roller = initRoller(ctx);
-  const brush = initBrush(ctx);
+  const roller = initRoller(canvSize);
+  const brush = initBrush();
   // Initialize labeler: draws text labels and "sprite" icons
-  const labeler = initLabeler(ctx, sprite);
+  const labeler = initLabeler(sprite);
 
   // Sort styles into groups
   const styles = {};
@@ -1781,14 +1771,14 @@ function initRenderer(canvSize, styleLayers, styleGroups, sprite, chains) {
   return {
     drawGroup,
     composite,
-    canvas,
   };
 
   function drawGroup(tile, groupName = "none", callback = () => undefined) {
     if (!styles[groupName]) return callback(null, tile);
 
-    // Clear context and bounding boxes
-    ctx.clearRect(0, 0, canvSize, canvSize);
+    // Clear rendering context and bounding boxes
+    let lamina = getLamina(tile, groupName);
+    lamina.ctx.clearRect(0, 0, canvSize, canvSize);
     labeler.clearBoxes();
 
     //styles[groupName].forEach( style => drawLayer(style, tile.z, tile.sources) );
@@ -1796,23 +1786,19 @@ function initRenderer(canvSize, styleLayers, styleGroups, sprite, chains) {
     // Draw the layers: asynchronously, but in order
     // Create a chain of functions, one for each layer.
     const drawCalls = styles[groupName].map(style => {
-      return chains.cbWrapper( () => drawLayer(style, tile.z, tile.sources) );
+      let link = () => drawLayer(lamina.ctx, style, tile.z, tile.sources);
+      return chains.cbWrapper(link);
     });
     // Execute the chain, with copyResult as the final callback
-    chains.callInOrder(drawCalls, copyResult);
+    chains.callInOrder(drawCalls, returnResult);
 
-    function copyResult() {
-      // Copy the rendered image to the tile
-      let lamina = getLamina(tile, groupName);
-      lamina.ctx.clearRect(0, 0, canvSize, canvSize);
-      lamina.ctx.drawImage(canvas, 0, 0);
-
+    function returnResult() {
       lamina.rendered = true;
       return callback(null, tile);
     }
   }
 
-  function drawLayer(style, zoom, sources) {
+  function drawLayer(ctx, style, zoom, sources) {
     // Quick exits if this layer is not meant to be displayed
     if (style.layout && style.layout["visibility"] === "none") return;
     if (style.minzoom !== undefined && zoom < style.minzoom) return;
@@ -1824,18 +1810,19 @@ function initRenderer(canvSize, styleLayers, styleGroups, sprite, chains) {
     // later, we need to re-save what we just restored
     ctx.save();
 
-    if (style.type === "background") return roller.fillBackground(style, zoom);
+    let type = style.type;
+    if (type === "background") return roller.fillBackground(ctx, style, zoom);
 
     var source = sources[ style["source"] ];
-    if (style.type === "raster") return roller.drawRaster(style, zoom, source);
+    if (type === "raster") return roller.drawRaster(ctx, style, zoom, source);
 
     var mapLayer = source[ style["source-layer"] ];
     var mapData = getFeatures(mapLayer, style.filter);
     if (!mapData) return;
 
-    return (style.type === "symbol") 
-      ? labeler.draw(style, zoom, mapData)
-      : brush(style, zoom, mapData);
+    return (type === "symbol") 
+      ? labeler.draw(ctx, style, zoom, mapData)
+      : brush(ctx, style, zoom, mapData);
   }
 }
 

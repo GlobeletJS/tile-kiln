@@ -1,7 +1,7 @@
 import { initTextLabeler } from "./text.js";
 import { initIconLabeler } from "./icons.js";
 
-export function initLabeler(ctx, sprite) {
+export function initLabeler(sprite) {
   var boxes = [];
 
   return {
@@ -13,7 +13,7 @@ export function initLabeler(ctx, sprite) {
     boxes = [];
   }
 
-  function draw(style, zoom, data) {
+  function draw(ctx, style, zoom, data) {
     var layout = style.layout;
     if (layout["symbol-placement"] === "line") return;
 

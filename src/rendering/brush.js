@@ -2,15 +2,15 @@ import * as d3 from 'd3-geo';
 import { buildStyleFunc } from "./styleFunction.js";
 
 // Renders layers made of points, lines, polygons (like painting with a brush)
-export function initBrush(ctx) {
-  // Input ctx is a Canvas 2D rendering context
+export function initBrush() {
 
-  // Initialize the D3 path generator. 
-  // First param is the projection. Keep the data's native coordinates for now
-  const path = d3.geoPath(null, ctx);
-  const setRadius = (radius) => { if (radius) path.pointRadius(radius); };
+  // TODO: Why bother to init?
+  return function(ctx, style, zoom, data) {
 
-  return function(style, zoom, data) {
+    // Initialize the D3 path generator. 
+    // First param is the projection. Keep the data's native coordinates for now
+    const path = d3.geoPath(null, ctx);
+
     var layout = style.layout;
     var paint = style.paint;
     var method;
@@ -21,6 +21,7 @@ export function initBrush(ctx) {
     // For data-dependent styles, store the state FUNCTIONS in dataDependencies
     switch (style.type) {
       case "circle":
+        let setRadius = (radius) => { if (radius) path.pointRadius(radius); };
         setState("", paint["circle-radius"], setRadius);
         setState("fillStyle", paint["circle-color"]);
         setState("globalAlpha", paint["circle-opacity"]);
@@ -57,7 +58,7 @@ export function initBrush(ctx) {
     }
 
     // Draw the features in the data
-    draw(data, dataDependencies, zoom, method);
+    draw(ctx, path, data, dataDependencies, zoom, method);
     return;
 
     function setState(option, val, stateFunc) { // Nested for access to zoom
@@ -70,10 +71,12 @@ export function initBrush(ctx) {
     }
   }
 
-  function draw(data, dataDependencies, zoom, method) {
-    if (dataDependencies.length == 0) return drawPath(data, method);
+  // TODO: from here down could be un-nested?
 
-    sortAndDraw(data, dataDependencies, zoom, method);
+  function draw(ctx, path, data, dataDependencies, zoom, method) {
+    if (dataDependencies.length == 0) return drawPath(ctx, path, data, method);
+
+    sortAndDraw(ctx, path, data, dataDependencies, zoom, method);
     //data.features.forEach(feature => {
     //  dataDependencies.forEach( dep => {
     //    dep.stateFunc( dep.styleFunc(zoom, feature) )
@@ -82,13 +85,13 @@ export function initBrush(ctx) {
     //});
   }
 
-  function drawPath(data, method) {
+  function drawPath(ctx, path, data, method) {
     ctx.beginPath();
     path(data);
     ctx[method]();
   }
 
-  function sortAndDraw(data, dataDependencies, zoom, method) {
+  function sortAndDraw(ctx, path, data, dataDependencies, zoom, method) {
     // Build an array of features, style values, and a sortable id
     let features = data.features.map( feature => {
       let vals = dataDependencies.map( dep => dep.styleFunc(zoom, feature) );

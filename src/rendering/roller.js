@@ -1,23 +1,21 @@
 import { evalStyle } from "./styleFunction.js";
 
 // Renders layers that cover the whole tile (like painting with a roller)
-export function initRoller(ctx) {
-  // Input ctx is a Canvas 2D rendering context
-  const canvSize = ctx.canvas.width;
+export function initRoller(canvSize) {
 
   return {
     fillBackground,
     drawRaster,
   };
 
-  function fillBackground(style, zoom) {
+  function fillBackground(ctx, style, zoom) {
     // Cover the tile with a bucket of paint
     ctx.fillStyle = evalStyle(style.paint["background-color"], zoom);
     ctx.globalAlpha = evalStyle(style.paint["background-opacity"], zoom);
     ctx.fillRect(0, 0, canvSize, canvSize);
   }
 
-  function drawRaster(style, zoom, image) {
+  function drawRaster(ctx, style, zoom, image) {
     // Cover the tile with a prettily patterned wallpaper
     var paint = style.paint;
     if (paint !== undefined) {
