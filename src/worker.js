@@ -1,4 +1,5 @@
 import { readMVT } from "./read.js";
+import { mergeMacrostrat } from "./macrostrat.js";
 
 onmessage = function(msgEvent) {
   // The message DATA as sent by the parent thread is now a property 
@@ -9,68 +10,56 @@ onmessage = function(msgEvent) {
   readMVT(payload.href, payload.size, returnResult);
 
   function returnResult(err, result) {
+    var msg;
+    if (err) return postMessage({ id, type: "error", payload: err });
+
     if (result["units"] !== undefined) {
       // Merge Macrostrat polygons with the same .id
-      //console.time('mergeMacrostrat');
       result["units"] = mergeMacrostrat(result["units"]);
-      //console.timeEnd('mergeMacrostrat');
     }
-    var msg = { id, err, payload: result };
-    postMessage(msg);
+
+    // Send a header with info about each layer
+    const header = {};
+    const layerNames = Object.keys(result);
+    layerNames.forEach(key => {
+      header[key] = result[key].features.length;
+    });
+    postMessage({ id, type: "header", payload: header });
+
+    // Send the data for each layer, one layer at a time
+    layerNames.forEach( key => sendChunks(key, result[key].features) );
+
+    // Break the layer down into smaller chunks
+    function sendChunks(key, features) {
+      let dataChunks = makeChunks(features);
+      dataChunks.forEach( chunk => sendChunk(key, chunk) );
+    }
+    function sendChunk(key, chunk) {
+      postMessage({ id, type: "data", key, payload: chunk });
+    }
+
+    // Send a message to confirm we are done
+    postMessage({ id, type: "done" });
   }
 }
 
-function mergeMacrostrat(layer) {
-  // Make sure this is really Macrostrat data
-  let testProps = layer.features[0].properties;
-  let isMacrostrat = testProps["map_id"] !== undefined &&
-    testProps["legend_id"] !== undefined;
-  if (!isMacrostrat) return layer;
+function makeChunks(arr) {
+  const maxChunk = 100000; // 100 KB
 
-  // Sort the polygons
-  const polys = layer.features.map( feature => {
-    delete feature.properties["map_id"];
-    feature.id = feature.properties["legend_id"];
-    return feature;
-  }).sort( (a, b) => (a.id < b.id) ? -1 : 1 );
-
-  // Combine polygons with the same .id
-  const multiPolys = [];
-  let numPolys = polys.length;
+  let len = arr.length;
   let i = 0;
-  while (i < numPolys) {
-    let id = polys[i].id;
+  let chunks = [];
 
-    // Set the properties for this .id
-    let feature = {
-      type: "Feature",
-      properties: polys[i].properties,
-      id: id,
-    };
-
-    // Collect the geometries of all polygons with this .id
-    let coords = [];
-    while (i < numPolys && polys[i].id === id) {
-      let geom = polys[i].geometry;
-      if (geom.type === "Polygon") {
-        coords.push(geom.coordinates);
-      } else if (geom.type === "MultiPolygon") {
-        geom.coordinates.forEach( coord => coords.push(coord) );
-      }
+  while (i < len) {
+    let chunk = [];
+    let chunkSize = 0;
+    while (i < len && chunkSize < maxChunk) {
+      chunkSize += JSON.stringify(arr[i]).length;
+      chunk.push(arr[i]);
       i++;
     }
-
-    // Append the combined geometry to the current feature
-    feature.geometry = { type: "MultiPolygon", coordinates: coords };
-
-    // Append this feature to the new feature set
-    multiPolys.push(feature);
+    chunks.push(chunk);
   }
 
-  const newCollection = {
-    type: "FeatureCollection",
-    features: multiPolys
-  };
-
-  return newCollection;
+  return chunks;
 }
