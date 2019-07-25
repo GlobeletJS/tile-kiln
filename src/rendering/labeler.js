@@ -2,18 +2,9 @@ import { initTextLabeler } from "./text.js";
 import { initIconLabeler } from "./icons.js";
 
 export function initLabeler(sprite) {
-  var boxes = [];
+  const boxes = [];
 
-  return {
-    clearBoxes,
-    draw,
-  };
-
-  function clearBoxes() {
-    boxes = [];
-  }
-
-  function draw(ctx, style, zoom, data) {
+  return function(ctx, style, zoom, data) {
     var layout = style.layout;
     if (layout["symbol-placement"] === "line") return;
 

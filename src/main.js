@@ -98,6 +98,15 @@ export function init(params) {
   }
 
   function drawAll(tile, callback = () => true, reportTime) {
+    if (tile.rendering) {
+      console.log("ERROR in tilekiln.drawAll: tile already rendering!");
+      console.log("  Not sure what to do... Continuing!");
+    }
+    if (tile.rendered) {
+      console.log("ERROR in tilekiln.drawAll: tile is already rendered??");
+      console.log("  Not sure what to do... Continuing!");
+    }
+
     // Flag this tile as in the process of rendering
     tile.rendering = true;
 

@@ -13,8 +13,6 @@ export function initRenderer(canvSize, styleLayers, styleGroups, sprite, chains)
 
   // Initialize roller, to paint single layers onto the canvas
   const roller = initRoller(canvSize);
-  // Initialize labeler: draws text labels and "sprite" icons
-  const labeler = initLabeler(sprite);
 
   // Sort styles into groups
   const styles = {};
@@ -51,16 +49,15 @@ export function initRenderer(canvSize, styleLayers, styleGroups, sprite, chains)
     let lamina = getLamina(tile, groupName);
     if (lamina.rendered) return callback(null, tile);
 
-    // Clear rendering context and bounding boxes
     lamina.ctx.clearRect(0, 0, canvSize, canvSize);
-    labeler.clearBoxes();
+    const labeler = initLabeler(sprite);
 
     //styles[groupName].forEach( style => drawLayer(style, tile.z, tile.sources) );
 
     // Draw the layers: asynchronously, but in order
     // Create a chain of functions, one for each layer.
     const drawCalls = styles[groupName].map(style => {
-      let link = () => drawLayer(lamina.ctx, style, tile.z, tile.sources);
+      let link = () => drawLayer(lamina.ctx, labeler, style, tile.z, tile.sources);
       return chains.cbWrapper(link);
     });
     // Execute the chain, with copyResult as the final callback
@@ -72,7 +69,7 @@ export function initRenderer(canvSize, styleLayers, styleGroups, sprite, chains)
     }
   }
 
-  function drawLayer(ctx, style, zoom, sources) {
+  function drawLayer(ctx, labeler, style, zoom, sources) {
     // Quick exits if this layer is not meant to be displayed
     if (style.layout && style.layout["visibility"] === "none") return;
     if (style.minzoom !== undefined && zoom < style.minzoom) return;
@@ -95,7 +92,7 @@ export function initRenderer(canvSize, styleLayers, styleGroups, sprite, chains)
     if (!mapData) return;
 
     return (type === "symbol") 
-      ? labeler.draw(ctx, style, zoom, mapData)
+      ? labeler(ctx, style, zoom, mapData)
       : brush(ctx, style, zoom, mapData);
   }
 }
