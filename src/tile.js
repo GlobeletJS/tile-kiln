@@ -51,7 +51,10 @@ export function initTileFactory(size, sources, styleGroups, reader) {
     }
 
     function checkData(err, key, data) {
-      if (err) return callback(err);
+      // If data retrieval errors, don't stop. We could be out of the range of
+      // one layer, but we may still be able to render the other layers
+      if (err) console.log(err);
+      // TODO: maybe stop if all layers have errors?
 
       tile.sources[key] = data;
       if (--numToDo > 0) return;

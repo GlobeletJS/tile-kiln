@@ -8,10 +8,11 @@ export function readMVT(dataHref, size, callback) {
   // Request the data
   var req = xhrGet(dataHref, "arraybuffer", parseMVT);
 
+  // Return the request, so it can be aborted if necessary
+  return req;
+
   function parseMVT(err, data) {
-    if (err) return (err.type === 404)
-      ? callback(null, {})           // Tile out of bounds? Don't rock the boat
-      : callback(err.message, data); // Other problems... Return the whole mess
+    if (err) return callback(err, data);
 
     //console.time('parseMVT');
     const pbuffer = new Protobuf( new Uint8Array(data) );
@@ -60,7 +61,7 @@ export function readJSON(dataHref, callback) {
   xhrGet(dataHref, "text", parseJSON);
 
   function parseJSON(err, data) {
-    if (err) return callback(err.message, data);
+    if (err) return callback(err, data);
     callback(null, JSON.parse(data), dataHref);
   }
 }

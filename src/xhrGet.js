@@ -12,23 +12,18 @@ export function xhrGet(href, type, callback) {
   req.open('get', href);
   req.send();
 
-  var err = {};
-
   function errHandler(e) {
-    err.type = e.type;
-    err.message = "XMLHttpRequest ended with an " + e.type;
+    let err = "XMLHttpRequest ended with an " + e.type;
     return callback(err);
   }
   function loadHandler(e) {
     if (req.responseType !== type) {
-      err.type = "TypeError";
-      err.message = "XMLHttpRequest: Wrong responseType. Expected " +
+      let err = "XMLHttpRequest: Wrong responseType. Expected " +
         type + ", got " + req.responseType;
       return callback(err, req.response);
     }
-    if (req.status === 404) {
-      err.type = 404;
-      err.message = "XMLHttpRequest: HTTP 404 error from " + href;
+    if (req.status !== 200) {
+      let err = "XMLHttpRequest: HTTP " + req.status + " error from " + href;
       return callback(err, req.response);
     }
     return callback(null, req.response);

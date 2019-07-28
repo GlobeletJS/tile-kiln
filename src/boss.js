@@ -12,15 +12,15 @@ export function initWorker(codeHref) {
   worker.onmessage = handleMsg;
 
   return {
-    startTask: sendMsg,
+    startTask: requestTile,
     numActive: () => activeTasks,
     terminate: worker.terminate,
   }
 
-  function sendMsg(payload, callback) {
+  function requestTile(payload, callback) {
     activeTasks ++;
     const msgId = globalMsgId++;
-    const msg = { id: msgId, payload };
+    const msg = { id: msgId, type: "request", payload };
 
     callbacks[msgId] = callback;
     worker.postMessage(msg);
@@ -33,13 +33,18 @@ export function initWorker(codeHref) {
     switch (msg.type) {
       case "error":
         return callback(msg.payload);
-      case "header":
+      case "header": {
         headers[msg.id] = msg.payload;
         payloads[msg.id] = initJSON(msg.payload);
+        let reply = { id: msg.id, type: "continue" };
+        worker.postMessage(reply);
         return;
+      }
       case "data": {
         let features = payloads[msg.id][msg.key].features;
         msg.payload.forEach( feature => features.push(feature) );
+        let reply = { id: msg.id, type: "continue" };
+        worker.postMessage(reply);
         return;
       }
       case "done":

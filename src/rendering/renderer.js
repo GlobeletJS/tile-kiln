@@ -85,6 +85,8 @@ export function initRenderer(canvSize, styleLayers, styleGroups, sprite, chains)
     if (type === "background") return roller.fillBackground(ctx, style, zoom);
 
     var source = sources[ style["source"] ];
+    if (!source) return;
+
     if (type === "raster") return roller.drawRaster(ctx, style, zoom, source);
 
     var mapLayer = source[ style["source-layer"] ];

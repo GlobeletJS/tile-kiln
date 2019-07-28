@@ -12,23 +12,18 @@ function xhrGet(href, type, callback) {
   req.open('get', href);
   req.send();
 
-  var err = {};
-
   function errHandler(e) {
-    err.type = e.type;
-    err.message = "XMLHttpRequest ended with an " + e.type;
+    let err = "XMLHttpRequest ended with an " + e.type;
     return callback(err);
   }
   function loadHandler(e) {
     if (req.responseType !== type) {
-      err.type = "TypeError";
-      err.message = "XMLHttpRequest: Wrong responseType. Expected " +
+      let err = "XMLHttpRequest: Wrong responseType. Expected " +
         type + ", got " + req.responseType;
       return callback(err, req.response);
     }
-    if (req.status === 404) {
-      err.type = 404;
-      err.message = "XMLHttpRequest: HTTP 404 error from " + href;
+    if (req.status !== 200) {
+      let err = "XMLHttpRequest: HTTP " + req.status + " error from " + href;
       return callback(err, req.response);
     }
     return callback(null, req.response);
@@ -45,7 +40,7 @@ function readJSON(dataHref, callback) {
   xhrGet(dataHref, "text", parseJSON);
 
   function parseJSON(err, data) {
-    if (err) return callback(err.message, data);
+    if (err) return callback(err, data);
     callback(null, JSON.parse(data), dataHref);
   }
 }
@@ -241,15 +236,15 @@ function initWorker(codeHref) {
   worker.onmessage = handleMsg;
 
   return {
-    startTask: sendMsg,
+    startTask: requestTile,
     numActive: () => activeTasks,
     terminate: worker.terminate,
   }
 
-  function sendMsg(payload, callback) {
+  function requestTile(payload, callback) {
     activeTasks ++;
     const msgId = globalMsgId++;
-    const msg = { id: msgId, payload };
+    const msg = { id: msgId, type: "request", payload };
 
     callbacks[msgId] = callback;
     worker.postMessage(msg);
@@ -262,13 +257,18 @@ function initWorker(codeHref) {
     switch (msg.type) {
       case "error":
         return callback(msg.payload);
-      case "header":
+      case "header": {
         headers[msg.id] = msg.payload;
         payloads[msg.id] = initJSON(msg.payload);
+        let reply = { id: msg.id, type: "continue" };
+        worker.postMessage(reply);
         return;
+      }
       case "data": {
         let features = payloads[msg.id][msg.key].features;
         msg.payload.forEach( feature => features.push(feature) );
+        let reply = { id: msg.id, type: "continue" };
+        worker.postMessage(reply);
         return;
       }
       case "done":
@@ -358,7 +358,10 @@ function initTileFactory(size, sources, styleGroups, reader) {
     }
 
     function checkData(err, key, data) {
-      if (err) return callback(err);
+      // If data retrieval errors, don't stop. We could be out of the range of
+      // one layer, but we may still be able to render the other layers
+      if (err) console.log(err);
+      // TODO: maybe stop if all layers have errors?
 
       tile.sources[key] = data;
       if (--numToDo > 0) return;
@@ -1827,6 +1830,8 @@ function initRenderer(canvSize, styleLayers, styleGroups, sprite, chains) {
     if (type === "background") return roller.fillBackground(ctx, style, zoom);
 
     var source = sources[ style["source"] ];
+    if (!source) return;
+
     if (type === "raster") return roller.drawRaster(ctx, style, zoom, source);
 
     var mapLayer = source[ style["source-layer"] ];
