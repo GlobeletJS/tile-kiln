@@ -1458,7 +1458,7 @@ onmessage = function(msgEvent) {
   const {id, type, payload} = msgEvent.data;
 
   switch (type) {
-    case "request":
+    case "start":
       let callback = (err, result) => sendHeader(id, err, result);
       let request  = readMVT(payload.href, payload.size, callback);
       tasks[id] = { request, status: "requested" };
