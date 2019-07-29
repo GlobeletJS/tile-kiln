@@ -14,6 +14,7 @@ export function init(params) {
   // Declare some variables & methods that will be defined inside a callback
   var groupNames, tileFactory, renderer, t0, t1, t2;
   var styleGroups = [];
+  var activeDrawCalls = 0;
 
   function setGroupVisibility(name, visibility) {
     var group = styleGroups.find(group => group.name === name);
@@ -26,6 +27,7 @@ export function init(params) {
     hideGroup: (name) => setGroupVisibility(name, false),
     showGroup: (name) => setGroupVisibility(name, true),
     redraw: () => undefined,
+    activeDrawCalls: () => activeDrawCalls,
     groups: [],
     ready: false,
   };
@@ -109,6 +111,7 @@ export function init(params) {
 
     // Flag this tile as in the process of rendering
     tile.rendering = true;
+    activeDrawCalls ++;
 
     //var numToDo = styleGroups.length;
     //styleGroups.forEach(group => {
@@ -139,6 +142,7 @@ export function init(params) {
 
       tile.rendered = true;
       tile.rendering = false;
+      activeDrawCalls --;
 
       if (!reportTime) return callback(null, tile);
       t2 = performance.now();
