@@ -66,7 +66,7 @@ export function init(params) {
     });
 
     tileFactory = initTileFactory(canvSize, styleDoc.sources, 
-      styleGroups, readThread.startTask);
+      styleGroups, readThread);
     renderer = initRenderer(canvSize, styleDoc.layers, 
       styleGroups, styleDoc.sprite, chains);
 

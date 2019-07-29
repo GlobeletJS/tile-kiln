@@ -306,11 +306,7 @@ function checkJSON(json, header) {
   }
 }
 
-//import { readMVT, loadImage } from "./read.js";
-
-// TODO: Move this to a worker thread. readMVT is CPU intensive
-// Also, convert images to ImageBitmaps?
-function initTileFactory(size, sources, styleGroups, reader) {
+function initTileFactory(size, sources, styleGroups, loader) {
   // Input size is the pixel size of the canvas used for vector rendering
   // Input sources is an OBJECT of TileJSON descriptions of tilesets
   // Input styleGroups is an ARRAY of objects { name, visible } for groupings of
@@ -322,11 +318,15 @@ function initTileFactory(size, sources, styleGroups, reader) {
   });
 
   function orderTile(z, x, y, callback = () => true) {
+    const loadTasks = {};
+    var numToDo = tileSourceKeys.length;
     var baseLamina = initLamina(size);
+
     const tile = {
       z, x, y,
       sources: {},
       loaded: false,
+      cancelLoad,
       img: baseLamina.img,
       ctx: baseLamina.ctx,
       rendering: baseLamina.rendering,
@@ -341,7 +341,6 @@ function initTileFactory(size, sources, styleGroups, reader) {
       });
     }
 
-    var numToDo = tileSourceKeys.length;
     tileSourceKeys.forEach( loadTile );
 
     function loadTile(srcKey) {
@@ -351,10 +350,14 @@ function initTileFactory(size, sources, styleGroups, reader) {
         //readMVT( tileHref, size, (err, data) => checkData(err, srcKey, data) );
         let readCallback = (err, data) => checkData(err, srcKey, data);
         let readPayload = { href: tileHref, size: size };
-        reader(readPayload, readCallback);
+        loadTasks[srcKey] = loader.startTask(readPayload, readCallback);
       } else if (src.type === "raster") {
         loadImage( tileHref, (err, data) => checkData(err, srcKey, data) );
       }
+    }
+
+    function cancelLoad() {
+      Object.values(loadTasks).forEach(task => loader.cancelTask(task));
     }
 
     function checkData(err, key, data) {
@@ -364,6 +367,7 @@ function initTileFactory(size, sources, styleGroups, reader) {
       // TODO: maybe stop if all layers have errors?
 
       tile.sources[key] = data;
+      delete loadTasks[key];
       if (--numToDo > 0) return;
 
       tile.loaded = true;
@@ -1975,7 +1979,7 @@ function init(params) {
     });
 
     tileFactory = initTileFactory(canvSize, styleDoc.sources, 
-      styleGroups, readThread.startTask);
+      styleGroups, readThread);
     renderer = initRenderer(canvSize, styleDoc.layers, 
       styleGroups, styleDoc.sprite, chains);
 
