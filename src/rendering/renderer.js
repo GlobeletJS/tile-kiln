@@ -57,11 +57,10 @@ export function initRenderer(canvSize, styleLayers, styleGroups, sprite, chains)
     // Draw the layers: asynchronously, but in order
     // Create a chain of functions, one for each layer.
     const drawCalls = styles[groupName].map(style => {
-      let link = () => drawLayer(lamina.ctx, labeler, style, tile.z, tile.sources);
-      return chains.cbWrapper(link);
+      return () => drawLayer(lamina.ctx, labeler, style, tile.z, tile.sources);
     });
     // Execute the chain, with copyResult as the final callback
-    chains.callInOrder(drawCalls, returnResult);
+    chains.chainSyncList(drawCalls, returnResult);
 
     function returnResult() {
       lamina.rendered = true;

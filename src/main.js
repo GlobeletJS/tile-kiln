@@ -121,11 +121,13 @@ export function init(params) {
     //});
 
     // Make a chain of functions to draw each group
-    const drawCalls = styleGroups.filter( group => group.visible )
-      .map( group => chains.cbInserter(makeDrawCall(group)) );
+    const drawCalls = styleGroups.filter(grp => grp.visible).map(makeDrawCall);
 
     function makeDrawCall(group) {
+      // Wrap a drawGroup call to make a function taking only a callback
+      // as an argument
       return (cb) => {
+        // Modify the callback to check the tile first
         let checkCb = (err, tile) => {
           check(err, tile, group.name);
           cb();
@@ -135,7 +137,7 @@ export function init(params) {
     }
 
     // Execute the chain, with putTogether as the final callback
-    chains.callInOrder( drawCalls, () => putTogether(tile) );
+    chains.chainAsyncList(drawCalls, putTogether);
 
     function putTogether() {
       renderer.composite(tile);
