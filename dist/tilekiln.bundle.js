@@ -324,14 +324,19 @@ function initTileFactory(size, sources, styleGroups, loader) {
 
     const tile = {
       z, x, y,
+      id: z + "/" + x + "/" + y,
+      priority: 0,
+
       sources: {},
-      loaded: false,
-      cancelLoad,
+      laminae: {},
       img: baseLamina.img,
       ctx: baseLamina.ctx,
+
+      loaded: false,
+      cancelLoad,
+      canceled: false,
       rendering: baseLamina.rendering,
       rendered: baseLamina.rendered,
-      laminae: {},
     };
 
     // Add canvases for separate rendering of layer groups, if supplied
@@ -1809,7 +1814,7 @@ function initRenderer(canvSize, styleLayers, styleGroups, sprite, chains) {
       return () => drawLayer(lamina.ctx, labeler, style, tile.z, tile.sources);
     });
     // Execute the chain, with copyResult as the final callback
-    chains.chainSyncList(drawCalls, returnResult);
+    chains.chainSyncList(drawCalls, returnResult, tile.id);
 
     function returnResult() {
       lamina.rendered = true;
@@ -1860,9 +1865,8 @@ function sortStyleGroup(layers, groupName) {
   return group.filter(layer => layer.type !== "symbol").concat(labels);
 }
 
-function initChainer(priorities = {}) {
-  // Input priorities (if supplied) is a hash of { id: priority } values
-
+function initChainer() {
+  const priorities = {};
   const timeouts = [];
   const messageName = "zero-timeout-message";
 
@@ -1871,6 +1875,7 @@ function initChainer(priorities = {}) {
   return {
     chainSyncList,
     chainAsyncList,
+    priorities,  // Update externally as a hash of { id: priority } values
   };
 
   function chainSyncList(funcs, finalCallback, taskId) {
@@ -1926,6 +1931,7 @@ function initChainer(priorities = {}) {
     if (timeouts.length < 1) return;
 
     // Get the task with the smallest priority
+    // TODO: what does this sort function do with undefined values?
     timeouts.sort( (a, b) => (priority(a.id) <= priority(b.id)) ? -1 : 1 );
     var task = timeouts.shift();
 
@@ -1956,22 +1962,25 @@ function init(params) {
     if (group) group.visible = visibility;
   }
 
-  const api = { // Initialize properties, update when styles load
-    style: {},    // WARNING: directly modifiable from calling program
-    create: () => undefined,
-    hideGroup: (name) => setGroupVisibility(name, false),
-    showGroup: (name) => setGroupVisibility(name, true),
-    redraw: () => undefined,
-    activeDrawCalls: () => activeDrawCalls,
-    groups: [],
-    ready: false,
-  };
-
   // Initialize a worker thread to read and parse MVT tiles
   const readThread = initWorker("./worker.bundle.js");
 
   // Initialize handler for chaining functions asynchronously
   const chains = initChainer();
+
+  const api = { // Initialize properties, update when styles load
+    style: {},    // WARNING: directly modifiable from calling program
+    groups: [],
+
+    create: () => undefined,
+    hideGroup: (name) => setGroupVisibility(name, false),
+    showGroup: (name) => setGroupVisibility(name, true),
+    redraw: () => undefined,
+    activeDrawCalls: () => activeDrawCalls,
+    priorities: chains.priorities,
+
+    ready: false,
+  };
 
   // Get the style info
   loadStyle(styleURL, mbToken, setup);
@@ -1986,7 +1995,7 @@ function init(params) {
       .map( layer => layer["tilekiln-group"] || "none" )
       .filter(uniq);
 
-    // Make sure the groups in order, not interleaved
+    // Make sure the groups are in order, not interleaved
     var groupCheck = groupNames.slice().sort().filter(uniq);
     if (groupNames.length !== groupCheck.length) {
       err = "tilekiln setup: Input layer groups are not in order!";
@@ -2035,6 +2044,9 @@ function init(params) {
   }
 
   function drawAll(tile, callback = () => true, reportTime) {
+    // If tile has been canceled, exit without even executing the callback
+    if (tile.canceled) return;
+
     if (tile.rendering) {
       console.log("ERROR in tilekiln.drawAll: tile already rendering!");
       console.log("  Not sure what to do... Continuing!");
@@ -2047,6 +2059,8 @@ function init(params) {
     // Flag this tile as in the process of rendering
     tile.rendering = true;
     activeDrawCalls ++;
+    // Set initial priority for rendering tasks
+    chains.priorities[tile.id] = tile.priority;
 
     //var numToDo = styleGroups.length;
     //styleGroups.forEach(group => {
@@ -2072,7 +2086,7 @@ function init(params) {
     }
 
     // Execute the chain, with putTogether as the final callback
-    chains.chainAsyncList(drawCalls, putTogether);
+    chains.chainAsyncList(drawCalls, putTogether, tile.id);
 
     function putTogether() {
       renderer.composite(tile);

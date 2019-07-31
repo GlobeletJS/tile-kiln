@@ -21,22 +21,25 @@ export function init(params) {
     if (group) group.visible = visibility;
   }
 
-  const api = { // Initialize properties, update when styles load
-    style: {},    // WARNING: directly modifiable from calling program
-    create: () => undefined,
-    hideGroup: (name) => setGroupVisibility(name, false),
-    showGroup: (name) => setGroupVisibility(name, true),
-    redraw: () => undefined,
-    activeDrawCalls: () => activeDrawCalls,
-    groups: [],
-    ready: false,
-  };
-
   // Initialize a worker thread to read and parse MVT tiles
   const readThread = initWorker("./worker.bundle.js");
 
   // Initialize handler for chaining functions asynchronously
   const chains = initChainer();
+
+  const api = { // Initialize properties, update when styles load
+    style: {},    // WARNING: directly modifiable from calling program
+    groups: [],
+
+    create: () => undefined,
+    hideGroup: (name) => setGroupVisibility(name, false),
+    showGroup: (name) => setGroupVisibility(name, true),
+    redraw: () => undefined,
+    activeDrawCalls: () => activeDrawCalls,
+    priorities: chains.priorities,
+
+    ready: false,
+  };
 
   // Get the style info
   loadStyle(styleURL, mbToken, setup);
@@ -51,7 +54,7 @@ export function init(params) {
       .map( layer => layer["tilekiln-group"] || "none" )
       .filter(uniq);
 
-    // Make sure the groups in order, not interleaved
+    // Make sure the groups are in order, not interleaved
     var groupCheck = groupNames.slice().sort().filter(uniq);
     if (groupNames.length !== groupCheck.length) {
       err = "tilekiln setup: Input layer groups are not in order!";
@@ -100,6 +103,9 @@ export function init(params) {
   }
 
   function drawAll(tile, callback = () => true, reportTime) {
+    // If tile has been canceled, exit without even executing the callback
+    if (tile.canceled) return;
+
     if (tile.rendering) {
       console.log("ERROR in tilekiln.drawAll: tile already rendering!");
       console.log("  Not sure what to do... Continuing!");
@@ -112,6 +118,8 @@ export function init(params) {
     // Flag this tile as in the process of rendering
     tile.rendering = true;
     activeDrawCalls ++;
+    // Set initial priority for rendering tasks
+    chains.priorities[tile.id] = tile.priority;
 
     //var numToDo = styleGroups.length;
     //styleGroups.forEach(group => {
@@ -137,7 +145,7 @@ export function init(params) {
     }
 
     // Execute the chain, with putTogether as the final callback
-    chains.chainAsyncList(drawCalls, putTogether);
+    chains.chainAsyncList(drawCalls, putTogether, tile.id);
 
     function putTogether() {
       renderer.composite(tile);

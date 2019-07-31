@@ -18,14 +18,19 @@ export function initTileFactory(size, sources, styleGroups, loader) {
 
     const tile = {
       z, x, y,
+      id: z + "/" + x + "/" + y,
+      priority: 0,
+
       sources: {},
-      loaded: false,
-      cancelLoad,
+      laminae: {},
       img: baseLamina.img,
       ctx: baseLamina.ctx,
+
+      loaded: false,
+      cancelLoad,
+      canceled: false,
       rendering: baseLamina.rendering,
       rendered: baseLamina.rendered,
-      laminae: {},
     };
 
     // Add canvases for separate rendering of layer groups, if supplied

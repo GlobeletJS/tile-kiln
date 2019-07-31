@@ -1,6 +1,5 @@
-export function initChainer(priorities = {}) {
-  // Input priorities (if supplied) is a hash of { id: priority } values
-
+export function initChainer() {
+  const priorities = {};
   const timeouts = [];
   const messageName = "zero-timeout-message";
 
@@ -9,6 +8,7 @@ export function initChainer(priorities = {}) {
   return {
     chainSyncList,
     chainAsyncList,
+    priorities,  // Update externally as a hash of { id: priority } values
   };
 
   function chainSyncList(funcs, finalCallback, taskId) {
@@ -64,6 +64,7 @@ export function initChainer(priorities = {}) {
     if (timeouts.length < 1) return;
 
     // Get the task with the smallest priority
+    // TODO: what does this sort function do with undefined values?
     timeouts.sort( (a, b) => (priority(a.id) <= priority(b.id)) ? -1 : 1 );
     var task = timeouts.shift();
 

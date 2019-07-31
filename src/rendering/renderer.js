@@ -60,7 +60,7 @@ export function initRenderer(canvSize, styleLayers, styleGroups, sprite, chains)
       return () => drawLayer(lamina.ctx, labeler, style, tile.z, tile.sources);
     });
     // Execute the chain, with copyResult as the final callback
-    chains.chainSyncList(drawCalls, returnResult);
+    chains.chainSyncList(drawCalls, returnResult, tile.id);
 
     function returnResult() {
       lamina.rendered = true;
