@@ -27,7 +27,7 @@ export function initTileFactory(size, sources, styleGroups, loader) {
       ctx: baseLamina.ctx,
 
       loaded: false,
-      cancelLoad,
+      cancel,
       canceled: false,
       rendering: baseLamina.rendering,
       rendered: baseLamina.rendered,
@@ -55,8 +55,9 @@ export function initTileFactory(size, sources, styleGroups, loader) {
       }
     }
 
-    function cancelLoad() {
+    function cancel() {
       Object.values(loadTasks).forEach(task => loader.cancelTask(task));
+      tile.canceled = true;
     }
 
     function checkData(err, key, data) {

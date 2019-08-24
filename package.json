@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "description": "Map tile rendering guided by a Mapbox style document",
   "main": "dist/tilekiln.bundle.js",
+  "module": "dist/tilekiln.bundle.js",
   "files": [
     "dist"
   ],
@@ -13,7 +14,8 @@
     "build-module": "rollup -c build/rollup.config.js",
     "build-examples": "npm run rollup-examples && npm run copy-worker",
     "rollup-examples": "cd examples && rollup -c",
-    "copy-worker": "echo examples/*/ | xargs -n 1 cp dist/worker.bundle.js"
+    "copy-worker": "echo examples/*/ | xargs -n 1 cp dist/worker.bundle.js",
+    "postversion": "git push && git push --tags"
   },
   "repository": {
     "type": "git",
@@ -35,15 +37,15 @@
   "homepage": "https://github.com/jjhembd/tilekiln#readme",
   "devDependencies": {
     "http-server": "^0.11.1",
-    "rollup": "^1.11.3",
+    "rollup": "^1.19.4",
     "rollup-plugin-commonjs": "^9.3.4",
     "rollup-plugin-json": "^4.0.0",
-    "rollup-plugin-node-resolve": "^4.2.3",
+    "rollup-plugin-node-resolve": "^4.2.4",
     "touchy": "github:jjhembd/touchy"
   },
   "dependencies": {
     "csscolorparser": "^1.0.3",
-    "d3-geo": "^1.11.3",
+    "d3-geo": "^1.11.6",
     "pbf": "github:jjhembd/pbf",
     "vector-tile-js": "github:jjhembd/vector-tile-js"
   }
