@@ -36,7 +36,7 @@ export function init(params) {
     showGroup: (name) => setGroupVisibility(name, true),
     redraw: () => undefined,
     activeDrawCalls: () => activeDrawCalls,
-    priorities: chains.priorities,
+    sortTasks: chains.sortTasks,
 
     ready: false,
   };
@@ -112,8 +112,6 @@ export function init(params) {
     // Flag this tile as in the process of rendering
     tile.rendering = true;
     activeDrawCalls ++;
-    // Set initial priority for rendering tasks
-    chains.priorities[tile.id] = tile.priority;
 
     //var numToDo = styleGroups.length;
     //styleGroups.forEach(group => {

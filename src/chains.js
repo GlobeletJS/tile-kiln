@@ -1,15 +1,21 @@
 export function initChainer() {
-  const priorities = {};
   const timeouts = [];
-  const messageName = "zero-timeout-message";
 
+  const messageName = "zero-timeout-message";
   window.addEventListener("message", handleMessage, true);
 
   return {
+    sortTasks,
     chainSyncList,
     chainAsyncList,
-    priorities,  // Update externally as a hash of { id: priority } values
   };
+
+  function sortTasks(ranking) {
+    // Rank each task according to the supplied ranking function
+    timeouts.forEach( task => { task.rank = ranking(task.id); } );
+    // Sort tasks: smaller rank number (or undefined rank) first
+    timeouts.sort( (a, b) => (a.rank > b.rank) ? 1 : -1 );
+  }
 
   function chainSyncList(funcs, finalCallback, taskId) {
     // Input funcs is an array of synchronous zero-argument functions
@@ -47,7 +53,7 @@ export function initChainer() {
   // https://dbaron.org/log/20100309-faster-timeouts
   // func is a function taking zero arguments
   function setZeroTimeout(func, id) {
-    timeouts.push({ id, func });
+    timeouts.push({ id, func, rank: 0 });
 
     // Don't let this message be picked up by another window:
     // set the targetOrigin to the current window origin
@@ -63,17 +69,8 @@ export function initChainer() {
     evnt.stopPropagation();
     if (timeouts.length < 1) return;
 
-    // Get the task with the smallest priority
-    // TODO: what does this sort function do with undefined values?
-    timeouts.sort( (a, b) => (priority(a.id) <= priority(b.id)) ? -1 : 1 );
-    var task = timeouts.shift();
-
-    // If priority is undefined, this task has been canceled.
-    if (priority(task.id) !== undefined) task.func();
-  }
-
-  function priority(id) {
-    if (id === undefined) return 0; // No task ID.
-    return priorities[id];
+    let task = timeouts.shift();
+    // If task rank is undefined, this task has been canceled.
+    if (task.rank !== undefined) task.func();
   }
 }
