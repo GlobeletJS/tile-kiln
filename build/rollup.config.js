@@ -1,5 +1,5 @@
 import resolve from 'rollup-plugin-node-resolve';
-import commonjs from 'rollup-plugin-commonjs'; // Yuck... needed for Mapbox modules :-(
+import commonjs from 'rollup-plugin-commonjs'; // Yuck... remove when possible
 import { glsl } from "./glsl-plugin.js";
 import pkg from "../package.json";
 

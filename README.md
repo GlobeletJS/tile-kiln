@@ -1,14 +1,23 @@
-# tilekiln
+# tile-kiln
+
+Map tile rendering guided by a Mapbox style document
+
 Inputs map data (both raster and vector) and renders it into tiles.
 Styling is guided by a document following the [Mapbox style specification].
+
+Please note: many features in Mapbox's specification are not implemented.
+tile-kiln is intended to be an 80/20 solution for vector tile rendering:
+implementing ~80% of the style specification with 20% of the code.
+
+Want another feature? We welcome pull requests!
 
 Check the simple [single-tile example] with dynamic style changes.
 
 [Mapbox style specification]: https://docs.mapbox.com/mapbox-gl-js/style-spec/
-[single-tile example]: https://jjhembd.github.io/tilekiln/examples/dynamic/index.html
+[single-tile example]: https://globeletjs.github.io/tile-kiln/examples/dynamic/index.html
 
 ## Initialization
-tilekiln.init takes a parameter object with the following properties:
+tileKiln.init takes a parameter object with the following properties:
 - style (REQUIRED): A URL pointing to a Mapbox style document.
 - token (OPTIONAL): A Mapbox API token. Required if style URL and tile
   endpoints follow the Mapbox shorthand (mapbox://...).

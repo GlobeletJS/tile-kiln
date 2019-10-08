@@ -1,7 +1,7 @@
 'use strict';
 
 import { initDisplay } from "./display.js";
-import * as tilekiln from "../../dist/tilekiln.bundle.js";
+import * as tilekiln from "../../dist/tile-kiln.bundle.js";
 import { initTouchy } from 'touchy';
 import { findNearest } from "./findNearest.js";
 

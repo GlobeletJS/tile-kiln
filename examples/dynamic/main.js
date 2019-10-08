@@ -1,7 +1,7 @@
 'use strict';
 
 import { initDisplay } from "./display.js";
-import * as tilekiln from "../../dist/tilekiln.bundle.js";
+import * as tilekiln from "../../dist/tile-kiln.bundle.js";
 
 const tzxy = [7, 28, 52];
 
