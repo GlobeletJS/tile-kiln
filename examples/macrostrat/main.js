@@ -45,22 +45,6 @@ export function main() {
       var box = display.element.getBoundingClientRect();
       var x = cursor.x() - box.left;
       var y = cursor.y() - box.top;
-//      var layers = currentTile.sources["wells"];
-//      var data = layers["TWDB_Groundwater_v2"];
-//      var feature = findNearest(x, y, 5, data.features);
-      // Print to info div
-//      info.innerHTML = "<pre>" + JSON.stringify(feature, null, 2) + "</pre>";
-
-      // Select this feature in the highlighted-well style
-//      var styles = tileMaker.style.layers;
-//      var highlighter = styles.find(layer => layer.id === "highlighted-well");
-
-//      if (feature && feature.properties) {
-//        highlighter.filter[2] = feature.properties.title.toString();
-//      }
-      //tileMaker.redraw(currentTile);
-//      tileMaker.drawGroup(currentTile, "highlight");
-//      tileMaker.composite(currentTile);
       display.context.clearRect(0, 0, 512, 512);
       display.context.drawImage(currentTile.img, 0, 0);
     }
