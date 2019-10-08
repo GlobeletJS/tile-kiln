@@ -46,7 +46,7 @@ tile.rendered = false;
 and call tilekiln.redraw(tile). Layer groups with
 ```javascript
 tile.laminae[group].rendered === true && tile.laminae[group].visible === true
-``
+```
 will simply be re-composited into the final image, without change.
 
 ## Initialization
