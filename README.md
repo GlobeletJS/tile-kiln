@@ -43,7 +43,7 @@ Then set
 tile.laminae[groupName].rendered = false;
 tile.rendered = false;
 ```
-and call tilekiln.redraw(tile). Layer groups with
+and call tileKiln.redraw(tile). Layer groups with
 ```javascript
 tile.laminae[group].rendered === true && tile.laminae[group].visible === true
 ```

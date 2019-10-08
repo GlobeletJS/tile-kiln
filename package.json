@@ -19,7 +19,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/globeletjs/tilekiln.git"
+    "url": "git+https://github.com/globeletjs/tile-kiln.git"
   },
   "keywords": [
     "map",

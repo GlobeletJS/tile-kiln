@@ -1996,7 +1996,7 @@ function init(params) {
     // Make sure the groups are in order, not interleaved
     var groupCheck = groupNames.slice().sort().filter(uniq);
     if (groupNames.length !== groupCheck.length) {
-      err = "tilekiln setup: Input layer groups are not in order!";
+      err = "tile-kiln setup: Input layer groups are not in order!";
       return callback(err);
     }
     
