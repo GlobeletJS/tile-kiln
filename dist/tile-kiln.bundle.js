@@ -139,13 +139,11 @@ function prepStyle(err, styleDoc, token, callback) {
   var sKeys = Object.keys(styleDoc.sources);
   var numToDo = sKeys.length;
 
-  // Add "sprite" object if needed
+  // Add "sprite" data object if needed
   if (styleDoc.sprite) {
     numToDo += 2;
     var spriteURLs = expandSpriteURLs(styleDoc.sprite, token);
-    // We will replace the .sprite URL with an object containing
-    // image and metadata
-    styleDoc.sprite = {};
+    styleDoc.spriteData = {};
     // Retrieve both .json and .png files
     loadImage(spriteURLs.image, prepSpriteImage);
     readJSON(spriteURLs.meta, prepSpriteMeta);
@@ -155,13 +153,13 @@ function prepStyle(err, styleDoc, token, callback) {
     
   function prepSpriteImage(err, png) {
     if (err) finishAll(err);
-    styleDoc.sprite.image = png;
+    styleDoc.spriteData.image = png;
     finishAll(null);
   }
 
   function prepSpriteMeta(err, json) {
     if (err) finishAll(err);
-    styleDoc.sprite.meta = json;
+    styleDoc.spriteData.meta = json;
     finishAll(null);
   }
 
@@ -2012,7 +2010,7 @@ function init(params) {
     tileFactory = initTileFactory(canvSize, styleDoc.sources, 
       styleGroups, readThread);
     renderer = initRenderer(canvSize, styleDoc.layers, 
-      styleGroups, styleDoc.sprite, chains);
+      styleGroups, styleDoc.spriteData, chains);
 
     // Update api
     // TODO: we could initialize renderer without styles, then send it the

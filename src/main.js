@@ -73,7 +73,7 @@ export function init(params) {
     tileFactory = initTileFactory(canvSize, styleDoc.sources, 
       styleGroups, readThread);
     renderer = initRenderer(canvSize, styleDoc.layers, 
-      styleGroups, styleDoc.sprite, chains);
+      styleGroups, styleDoc.spriteData, chains);
 
     // Update api
     // TODO: we could initialize renderer without styles, then send it the
