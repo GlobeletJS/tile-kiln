@@ -1,5 +1,5 @@
 import { xhrGet } from "./xhrGet.js";
-import { Pbf as Protobuf } from 'pbf';
+import Protobuf from 'pbf';
 import { VectorTile } from 'vector-tile-js';
 
 export function readMVT(dataHref, size, callback) {

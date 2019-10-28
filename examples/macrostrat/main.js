@@ -2,7 +2,6 @@
 
 import { initDisplay } from "./display.js";
 import * as tilekiln from "../../dist/tile-kiln.bundle.js";
-import { initTouchy } from 'touchy';
 import { findNearest } from "./findNearest.js";
 
 const tzxy = [6, 16, 25]; // This tile takes 240-250ms with version #e5da070f...
@@ -10,9 +9,6 @@ const tzxy = [6, 16, 25]; // This tile takes 240-250ms with version #e5da070f...
 export function main() {
   // Initialize the display canvas and rendering context
   const display = initDisplay('map');
-
-  // Set up mouse tracking
-  const cursor = initTouchy(display.element); 
 
   // Get a link to the tile coordinates printout
   var title = document.getElementById("zxy");
@@ -41,10 +37,6 @@ export function main() {
 
   function checkRender(time) {
     if (currentTile) {
-      // Find the well nearest the cursor
-      var box = display.element.getBoundingClientRect();
-      var x = cursor.x() - box.left;
-      var y = cursor.y() - box.top;
       display.context.clearRect(0, 0, 512, 512);
       display.context.drawImage(currentTile.img, 0, 0);
     }

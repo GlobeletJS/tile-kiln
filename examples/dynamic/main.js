@@ -3,7 +3,7 @@
 import { initDisplay } from "./display.js";
 import * as tilekiln from "../../dist/tile-kiln.bundle.js";
 
-const tzxy = [7, 28, 52];
+const tzxy = [6, 14, 26];
 
 export function main() {
   // Initialize the display canvas and rendering context

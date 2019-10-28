@@ -33,6 +33,8 @@ function xhrGet(href, type, callback) {
   return req;
 }
 
+var utf8TextDecoder = typeof TextDecoder === 'undefined' ? null : new TextDecoder('utf8');
+
 function readJSON(dataHref, callback) {
   // Input dataHref is the path to a file containing JSON
 

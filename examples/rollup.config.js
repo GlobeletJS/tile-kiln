@@ -1,77 +1,28 @@
+var fs = require('fs');
 import resolve from 'rollup-plugin-node-resolve';
-import commonjs from 'rollup-plugin-commonjs'; // Yuck... needed for iee754 package
 import json from 'rollup-plugin-json';
 
-export default [{
-  input: 'mvt/main.js',
-  plugins: [
-    resolve(),
-    commonjs(),
-    json(),
-  ],
-  output: {
-    file: 'mvt/main.min.js',
-    format: 'iife',
-    name: 'mvt',
-  },
-}, {
-  input: 'dynamic/main.js',
-  plugins: [
-    resolve(),
-    commonjs(),
-    json(),
-  ],
-  output: {
-    file: 'dynamic/main.min.js',
-    format: 'iife',
-    name: 'dynamic',
-  },
-}, {
-  input: 'labels/main.js',
-  plugins: [
-    resolve(),
-    commonjs(),
-    json(),
-  ],
-  output: {
-    file: 'labels/main.min.js',
-    format: 'iife',
-    name: 'labels',
-  },
-}, {
-  input: 'sandwich/main.js',
-  plugins: [
-    resolve(),
-    commonjs(),
-    json(),
-  ],
-  output: {
-    file: 'sandwich/main.min.js',
-    format: 'iife',
-    name: 'sandwich',
-  },
-}, {
-  input: 'macrostrat/main.js',
-  plugins: [
-    resolve(),
-    commonjs(),
-    json(),
-  ],
-  output: {
-    file: 'macrostrat/main.min.js',
-    format: 'iife',
-    name: 'macrostrat',
-  },
-}, {
-  input: 'workers/main.js',
-  plugins: [
-    resolve(),
-    commonjs(),
-    json(),
-  ],
-  output: {
-    file: 'workers/main.min.js',
-    format: 'iife',
-    name: 'workers',
-  },
-}];
+// Get a list of the directory names
+const dirNames = fs
+  .readdirSync('./', { withFileTypes: true })
+  .filter(d => d.isDirectory())
+  .map(d => d.name);
+
+// Function to make a rollup config object from a directory name
+function makeConfig(dir) {
+  return {
+    input: dir + '/main.js',
+    plugins: [
+      json(),
+      resolve(),
+    ],
+    output: {
+      file: dir + '/main.min.js',
+      format: 'iife',
+      name: 'app',
+    }
+  };
+}
+
+// Export an array of config objects
+export default dirNames.map(makeConfig);

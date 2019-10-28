@@ -41,12 +41,12 @@
     "rollup-plugin-commonjs": "^9.3.4",
     "rollup-plugin-json": "^4.0.0",
     "rollup-plugin-node-resolve": "^4.2.4",
-    "touchy": "github:jjhembd/touchy"
+    "touch-sampler": "0.0.1"
   },
   "dependencies": {
     "csscolorparser": "^1.0.3",
     "d3-geo": "^1.11.6",
-    "pbf": "github:jjhembd/pbf",
+    "pbf": "^3.2.1",
     "vector-tile-js": "github:jjhembd/vector-tile-js"
   }
 }

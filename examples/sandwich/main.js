@@ -2,7 +2,7 @@
 
 import { initDisplay } from "./display.js";
 import * as tilekiln from "../../dist/tile-kiln.bundle.js";
-import { initTouchy } from 'touchy';
+import { initTouch } from 'touch-sampler';
 import { findNearest } from "./findNearest.js";
 
 const tzxy = [7, 28, 52];
@@ -12,7 +12,7 @@ export function main() {
   const display = initDisplay('map');
 
   // Set up mouse tracking
-  const cursor = initTouchy(display.element); 
+  const cursor = initTouch(display.element); 
 
   // Get a link to the tile coordinates printout
   var title = document.getElementById("zxy");
