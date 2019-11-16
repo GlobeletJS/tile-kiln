@@ -1,6 +1,6 @@
 {
   "name": "tile-kiln",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Map tile rendering guided by a Mapbox style document",
   "main": "dist/tile-kiln.bundle.js",
   "module": "dist/tile-kiln.bundle.js",
