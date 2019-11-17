@@ -1495,7 +1495,6 @@ onmessage = function(msgEvent) {
       if (task && task.status === "requested") task.request.abort();
       delete tasks[id];
       break;
-    default:
       // Bad message type!
   }
 };

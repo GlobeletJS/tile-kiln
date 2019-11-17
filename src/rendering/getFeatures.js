@@ -32,7 +32,9 @@ function prepFilter(filterObj) {
       let filters = vals.map(prepFilter);
       return (d) => filters.every( filt => !filt(d) );
     }
-    default: break; // Must be a simple filter
+    // EMPTY DEFAULT BREAKS ROLLUP. Commented out for now.
+    // See https://github.com/rollup/rollup/issues/3236
+    //default: break; // Must be a simple filter
   }
 
   [type, key, ...vals] = filterObj;
