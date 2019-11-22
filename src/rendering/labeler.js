@@ -1,15 +1,16 @@
-import { initTextLabeler } from "./text.js";
-import { initIconLabeler } from "./icons.js";
+import { textSetup } from "./text.js";
+import { iconSetup } from "./icons.js";
 
-export function initLabeler(sprite) {
-  const boxes = [];
+export function initLabeler(style, sprite) {
+  // Skip unsupported symbol types
+  if (style.layout["symbol-placement"] === "line") return () => undefined;
 
-  return function(ctx, style, zoom, data) {
-    var layout = style.layout;
-    if (layout["symbol-placement"] === "line") return;
+  const initTextLabeler = textSetup(style);
+  const initIconLabeler = iconSetup(style, sprite);
 
-    const textLabeler = initTextLabeler(ctx, style, zoom);
-    const iconLabeler = initIconLabeler(ctx, style, zoom, sprite);
+  return function(ctx, zoom, data, boxes) {
+    const textLabeler = initTextLabeler(ctx, zoom);
+    const iconLabeler = initIconLabeler(ctx, zoom);
 
     data.features.forEach(drawLabel);
 
@@ -26,13 +27,12 @@ export function initLabeler(sprite) {
       // Draw the labels
       iconLabeler.draw();
       textLabeler.draw();
-      return;
     }
-  }
 
-  function collides(newBox) {
-    if (!newBox) return false;
-    return boxes.some( box => intersects(box, newBox) );
+    function collides(newBox) {
+      if (!newBox) return false;
+      return boxes.some( box => intersects(box, newBox) );
+    }
   }
 }
 

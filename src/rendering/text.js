@@ -1,47 +1,58 @@
-import { evalStyle } from "./styleFunction.js";
+import { collectGetters } from "./style-function.js";
 import { getTokenParser } from "./tokens.js";
-import { getFontString } from "./font.js";
+import { getFontString  } from "./font.js";
+import { getTextShift, getTextTransform } from "./text-utils.js";
 
-export function initTextLabeler(ctx, style, zoom) {
-  var labelText, labelLength, labelHeight, x, y;
-  var posShift = [0, 0];
-  var layout = style.layout;
+export function textSetup(style) {
+  // Parse the style properties into zoom-dependent functions
+  const getLayout = collectGetters(style.layout, [
+    ["text-field"],
+    ["text-size", 16],
+    ["text-font"],
+    ["text-line-height", 1.2],
+    ["text-padding", 2.0],
+    ["text-offset", [0, 0]],
+    ["text-anchor"],
+    ["text-transform", "none"],
+  ]);
 
-  var textField = evalStyle(layout["text-field"], zoom);
-  var textParser = getTokenParser(textField);
+  const getPaint = collectGetters(style.paint, [
+    ["text-color"],
+    ["text-halo-color"],
+    ["text-halo-width", 0],
+  ]);
 
-  // Construct the ctx.font string from text-size and text-font
-  var fontSize = evalStyle(layout["text-size"], zoom) || 16;
-  var fontFace = evalStyle(layout["text-font"], zoom);
+  return (ctx, zoom) => initTextLabeler(ctx, zoom, getLayout, getPaint);
+}
+
+function initTextLabeler(ctx, zoom, layout, paint) {
+  const textParser = getTokenParser( layout["text-field"](zoom) );
+
+  const fontSize = layout["text-size"](zoom);
+  const fontFace = layout["text-font"](zoom);
   ctx.font = getFontString(fontSize, fontFace);
 
-  // Get some basic style parameters
-  let lineHeight = evalStyle(layout["text-line-height"], zoom) || 1.2;
-  let textPadding = evalStyle(layout["text-padding"], zoom) || 2.0;
-  let textOffset = evalStyle(layout["text-offset"], zoom) || [0, 0];
+  const lineHeight = layout["text-line-height"](zoom);
+  const textPadding = layout["text-padding"](zoom);
+  const textOffset = layout["text-offset"](zoom);
 
-  // Set text-anchor
-  var anchor = evalStyle(layout["text-anchor"], zoom);
-  setAnchor(anchor);
+  ctx.textBaseline = "bottom";
+  ctx.textAlign = "left";
+  const posShift = getTextShift( layout["text-anchor"](zoom) );
 
-  // Setup the text transform function
-  var transformCode = evalStyle(layout["text-transform"], zoom);
-  var transform = constructTextTransform(transformCode);
+  const transform = getTextTransform( layout["text-transform"](zoom) );
 
-  // Set text color and halo properties
-  var paint = style.paint;
-  ctx.fillStyle   = evalStyle(paint["text-color"], zoom);
-  ctx.strokeStyle = evalStyle(paint["text-halo-color"], zoom);
-  var haloWidth   = evalStyle(paint["text-halo-width"], zoom) || 0;
+  const haloWidth = paint["text-halo-width"](zoom);
   if (haloWidth > 0) {
     ctx.lineWidth = haloWidth * 2.0;
     ctx.lineJoin = "round";
+    ctx.strokeStyle = paint["text-halo-color"](zoom);
   }
+  ctx.fillStyle = paint["text-color"](zoom);
 
-  return {
-    measure,
-    draw,
-  };
+  var labelText, labelLength, labelHeight, x, y;
+
+  return { measure, draw };
 
   function measure(feature) {
     labelText = textParser(feature.properties);
@@ -68,67 +79,5 @@ export function initTextLabeler(ctx, style, zoom) {
 
     if (haloWidth > 0) ctx.strokeText(labelText, x, y);
     ctx.fillText(labelText, x, y);
-  }
-
-  function setAnchor(anchor) {
-    // Set baseline. We let Canvas2D use textBaseline = "bottom", and use
-    // posShift to shift the text box for other requested baselines
-    ctx.textBaseline = "bottom";
-    switch (anchor) {
-      case "top-left":
-      case "top-right":
-      case "top":
-        //ctx.textBaseline = "top";
-        posShift[1] = 1.0;
-        break;
-      case "bottom-left":
-      case "bottom-right":
-      case "bottom":
-        posShift[1] = 0.0;
-        //ctx.textBaseline = "bottom";
-        break;
-      case "left":
-      case "right":
-      case "center":
-      default:
-        //ctx.textBaseline = "middle";
-        posShift[1] = 0.5;
-    }
-    // Set textAlign. We let Canvas2D use textAlign = "left", and use
-    // posShift to shift the text box for other requested alignments
-    ctx.textAlign = "left";
-    switch (anchor) {
-      case "top-left":
-      case "bottom-left":
-      case "left":
-        //ctx.textAlign = "left";
-        posShift[0] = 0.0;
-        break;
-      case "top-right":
-      case "bottom-right":
-      case "right":
-        //ctx.textAlign = "right";
-        posShift[0] = -1.0;
-        break;
-      case "top":
-      case "bottom":
-      case "center":
-      default:
-        //ctx.textAlign = "center";
-        posShift[0] = -0.5;
-    }
-    return;
-  }
-}
-
-function constructTextTransform(code) {
-  switch (code) {
-    case "uppercase":
-      return f => f.toUpperCase();
-    case "lowercase":
-      return f => f.toLowerCase();
-    case "none":
-    default:
-      return f => f;
   }
 }

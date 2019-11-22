@@ -1,114 +1,78 @@
+import { getSetters } from "./brush-setters.js";
 import * as d3 from 'd3-geo';
-import { buildStyleFunc } from "./styleFunction.js";
 
-// Renders layers made of points, lines, polygons (like painting with a brush)
-export function brush(ctx, style, zoom, data) {
+export function initBrush(style) {
+  const { dataFuncs, zoomFuncs, methods } = getSetters(style);
 
-  // Initialize the D3 path generator. 
-  // First param is the projection. Keep the data's native coordinates for now
-  const path = d3.geoPath(null, ctx);
+  const setZoomFuncs = (zoom, ctx, path) => zoomFuncs.forEach(f => {
+    return f.setState(f.getStyle(zoom), ctx, path);
+  });
 
-  var layout = style.layout;
-  var paint = style.paint;
-  var method;
+  const prepData = (dataFuncs.length > 0)
+    ? (zoom, data) => addStylesToFeatures(dataFuncs, zoom, data)
+    : (zoom, data) => data;
 
-  const dataDependencies = [];
+  // Choose render function
+  const draw = (dataFuncs.length > 0)
+    ? (ctx, path, data) => drawVarying(data, ctx, path, methods, dataFuncs)
+    : (ctx, path, data) => drawConstant(data, ctx, path, methods);
 
-  // Set rendering context state based on values specified in the style.
-  // For data-dependent styles, store the state FUNCTIONS in dataDependencies
-  switch (style.type) {
-    case "circle":
-      let setRadius = (radius) => { if (radius) path.pointRadius(radius); };
-      setState("", paint["circle-radius"], setRadius);
-      setState("fillStyle", paint["circle-color"]);
-      setState("globalAlpha", paint["circle-opacity"]);
-      method = "fill";
-      break;
+  return function(ctx, zoom, data) {
+    const path = d3.geoPath(null, ctx);
 
-    case "line":
-      if (layout) {
-        setState("lineCap", layout["line-cap"]);
-        setState("lineJoin", layout["line-join"]);
-        setState("miterLimit", layout["line-miter-limit"]);
-        // Missing line-round-limit
-      }
-      setState("lineWidth", paint["line-width"]);
-      setState("globalAlpha", paint["line-opacity"]);
-      setState("strokeStyle", paint["line-color"]);
-      // Missing line-gap-width, line-translate, line-translate-anchor,
-      //  line-offset, line-blur, line-gradient, line-pattern, line-dasharray
-      method = "stroke";
-      break;
+    // Set the non-data-dependent state
+    setZoomFuncs(zoom, ctx, path);
 
-    case "fill":
-      setState("fillStyle", paint["fill-color"]);
-      setState("globalAlpha", paint["fill-opacity"]);
-      // Missing fill-outline-color, fill-translate, fill-translate-anchor,
-      //  fill-pattern
-      method = "fill";
-      break;
+    // Prepare the data, computing data-dependent styles if needed
+    const preppedData = prepData(zoom, data);
 
-    default:
-      // Missing fill-extrusion, heatmap, hillshade
-      return console.log("ERROR in brush.draw: layer.type = " +
-        style.type + " not supported!");
+    // Draw everything and return
+    return draw(ctx, path, preppedData);
   }
+}
 
-  // Draw the features in the data
-  //draw(ctx, path, data, dataDependencies, zoom, method);
-  if (dataDependencies.length == 0) return drawPath();
+function addStylesToFeatures(propFuncs, zoom, data) {
+  // Build an array of features, adding style values and a sortable id
+  // WARNING: modifies the features in the original data object!
+  let styledFeatures = data.features.map(feature => {
+    feature.styles = propFuncs.map(f => f.getStyle(zoom, feature));
+    feature.styleID = feature.styles.join("|");
+    return feature;
+  });
 
-  return sortAndDraw();
-  //data.features.forEach(feature => {
-  //  dataDependencies.forEach( dep => {
-  //    dep.stateFunc( dep.styleFunc(zoom, feature) )
-  //  });
-  // drawPath(feature, method);
-  //});
+  // Sort the array, to collect features with the same styling
+  styledFeatures.sort( (a, b) => (a.styleID < b.styleID) ? -1 : 1 );
 
-  function setState(option, val, stateFunc) { // Nested for access to zoom
-    if (!stateFunc) stateFunc = (val) => { ctx[option] = val; };
+  // Return a valid GeoJSON Feature Collection
+  return { type: "FeatureCollection", features: styledFeatures };
+}
 
-    let styleFunc = buildStyleFunc(val);
-    if (styleFunc.type !== "property") return stateFunc(styleFunc(zoom));
+function drawConstant(data, ctx, path, methods) {
+  // Draw all the data with the current canvas state
+  ctx.beginPath();
+  path(data);
+  methods.forEach(method => ctx[method]());
+}
 
-    dataDependencies.push({ styleFunc, stateFunc });
-  }
+function drawVarying(data, ctx, path, methods, propFuncs) {
+  // Draw features, updating canvas state as data-dependent styles change
 
-  function drawPath() {
+  let numFeatures = data.features.length;
+  let i = 0;
+  while (i < numFeatures) {
+    // Set state based on the styles of the current feature
+    let styles = data.features[i].styles;
+    propFuncs.forEach( (f, j) => f.setState(styles[j], ctx, path) );
+
     ctx.beginPath();
-    path(data);
-    ctx[method]();
-  }
-
-  function sortAndDraw() {
-    // Build an array of features, style values, and a sortable id
-    let features = data.features.map( feature => {
-      let vals = dataDependencies.map( dep => dep.styleFunc(zoom, feature) );
-      let id = vals.join("");
-      return { id, vals, feature };
-    });
-
-    // Sort the array
-    features.sort( (a, b) => (a.id < b.id) ? -1 : 1 );
-
-    // Loop through the array, accumulating paths and rendering
-    let numFeatures = features.length;
-    let i = 0;
-    while (i < numFeatures) {
-      // Set state for this group of features (only when style id changes)
-      dataDependencies.forEach( (dep, index) => {
-        dep.stateFunc(features[i].vals[index]);
-      });
-      // Add these features to the path
-      ctx.beginPath();
-      let id = features[i].id;
-      while (i < numFeatures && features[i].id === id) {
-        path(features[i].feature);
-        i++;
-      }
-      // Render these features
-      ctx[method]();
+    // Add features to the path, until the styles change
+    let id = data.features[i].styleID;
+    while (i < numFeatures && data.features[i].styleID === id) {
+      path(data.features[i]);
+      i++;
     }
+
+    // Render the current path
+    methods.forEach(method => ctx[method]());
   }
 }

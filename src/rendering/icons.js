@@ -1,23 +1,25 @@
-import { evalStyle } from "./styleFunction.js";
+import { collectGetters } from "./style-function.js";
 import { getTokenParser } from "./tokens.js";
 
-export function initIconLabeler(ctx, style, zoom, sprite) {
-  var layout = style.layout;
+export function iconSetup(style, sprite) {
+  const getLayout = collectGetters(style.layout, [
+    ["icon-image"],
+    ["icon-padding", 2],
+  ]);
+
+  return (ctx, zoom) => initIconLabeler(ctx, zoom, getLayout, sprite);
+}
+
+function initIconLabeler(ctx, zoom, layout, sprite) {
+  const getSpriteID = getTokenParser( layout["icon-image"](zoom) );
+  const iconPadding = layout["icon-padding"](zoom);
+
   var spriteID, spriteMeta, x, y;
 
-  // Get sprite metadata
-  var spriteName = evalStyle(layout["icon-image"], zoom);
-  var iconParser = getTokenParser(spriteName);
-
-  var iconPadding = evalStyle(layout["icon-padding"], zoom) || 2;
-
-  return {
-    measure,
-    draw,
-  };
+  return { measure, draw };
 
   function measure(feature) {
-    spriteID = iconParser(feature.properties);
+    spriteID = getSpriteID(feature.properties);
     if (!spriteID) return;
 
     spriteMeta = sprite.meta[spriteID];
@@ -36,15 +38,15 @@ export function initIconLabeler(ctx, style, zoom, sprite) {
     if (!spriteID) return;
 
     ctx.drawImage(
-        sprite.image,
-        spriteMeta.x,
-        spriteMeta.y,
-        spriteMeta.width,
-        spriteMeta.height,
-        x,
-        y,
-        spriteMeta.width,
-        spriteMeta.height
-        );
+      sprite.image,
+      spriteMeta.x,
+      spriteMeta.y,
+      spriteMeta.width,
+      spriteMeta.height,
+      x,
+      y,
+      spriteMeta.width,
+      spriteMeta.height
+    );
   }
 }

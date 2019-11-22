@@ -1,7 +1,4 @@
-import { getFeatures } from "./getFeatures.js";
-import { initRoller } from "./roller.js";
-import { brush } from "./brush.js";
-import { initLabeler } from "./labeler.js";
+import { initPainter } from "./painter.js";
 
 export function initRenderer(canvSize, styleLayers, styleGroups, sprite, chains) {
   // Input canvSize is an integer, for the pixel size of the (square) tiles
@@ -11,8 +8,10 @@ export function initRenderer(canvSize, styleLayers, styleGroups, sprite, chains)
   //   "tilekiln-group" property of each layer
   // Input sprite (if defined) is an object with image and meta properties
 
-  // Initialize roller, to paint single layers onto the canvas
-  const roller = initRoller(canvSize);
+  // Parse the styles into rendering functions, attached to the styles
+  styleLayers.forEach(layer => {
+    layer.painter = initPainter(canvSize, layer, sprite);
+  });
 
   // Sort styles into groups
   const styles = {};
@@ -50,14 +49,12 @@ export function initRenderer(canvSize, styleLayers, styleGroups, sprite, chains)
     if (lamina.rendered) return callback(null, tile);
 
     lamina.ctx.clearRect(0, 0, canvSize, canvSize);
-    const labeler = initLabeler(sprite);
-
-    //styles[groupName].forEach( style => drawLayer(style, tile.z, tile.sources) );
+    const boundingBoxes = [];
 
     // Draw the layers: asynchronously, but in order
     // Create a chain of functions, one for each layer.
-    const drawCalls = styles[groupName].map(style => {
-      return () => drawLayer(lamina.ctx, labeler, style, tile.z, tile.sources);
+    const drawCalls = styles[groupName].map(layer => {
+      return () => layer.painter(lamina.ctx, tile.z, tile.sources, boundingBoxes);
     });
     // Execute the chain, with copyResult as the final callback
     chains.chainSyncList(drawCalls, returnResult, tile.id);
@@ -66,35 +63,6 @@ export function initRenderer(canvSize, styleLayers, styleGroups, sprite, chains)
       lamina.rendered = true;
       return callback(null, tile);
     }
-  }
-
-  function drawLayer(ctx, labeler, style, zoom, sources) {
-    // Quick exits if this layer is not meant to be displayed
-    if (style.layout && style.layout["visibility"] === "none") return;
-    if (style.minzoom !== undefined && zoom < style.minzoom) return;
-    if (style.maxzoom !== undefined && zoom > style.maxzoom) return;
-
-    // Start from default canvas state: restore what we saved
-    ctx.restore();
-    // restore POPS the saved state off a stack. So if we want to restore again
-    // later, we need to re-save what we just restored
-    ctx.save();
-
-    let type = style.type;
-    if (type === "background") return roller.fillBackground(ctx, style, zoom);
-
-    var source = sources[ style["source"] ];
-    if (!source) return;
-
-    if (type === "raster") return roller.drawRaster(ctx, style, zoom, source);
-
-    var mapLayer = source[ style["source-layer"] ];
-    var mapData = getFeatures(mapLayer, style.filter);
-    if (!mapData) return;
-
-    return (type === "symbol") 
-      ? labeler(ctx, style, zoom, mapData)
-      : brush(ctx, style, zoom, mapData);
   }
 }
 

@@ -1,15 +1,21 @@
 import { parseCSSColor } from 'csscolorparser';
 
-export function evalStyle(styleFunction, zoom) {
-  var styleFunc = buildStyleFunc(styleFunction);
-  return styleFunc(zoom);
+export function collectGetters(properties = {}, keyDefaultPairs) {
+  const getters = {};
+  keyDefaultPairs.forEach( ([key, defaultVal]) => {
+    getters[key] = buildStyleFunc(properties[key], defaultVal);
+  });
+  return getters;
 }
 
-export function buildStyleFunc(style) {
+export function buildStyleFunc(style, defaultVal) {
   var styleFunc, getArg;
 
-  if (typeof style !== "object" || Array.isArray(style)) {
-    // Includes the case style === undefined
+  if (style === undefined) {
+    styleFunc = () => defaultVal;
+    styleFunc.type = "constant";
+
+  } else if (typeof style !== "object" || Array.isArray(style)) {
     styleFunc = () => style;
     styleFunc.type = "constant";
 

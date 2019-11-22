@@ -1,16 +1,4 @@
-export function getFeatures(layer, filterObj) {
-  // Based on https://observablehq.com/@mbostock/d3-mapbox-vector-tiles
-  if (!layer) return;
-  var filter = prepFilter(filterObj);
-
-  var features = layer.features.filter(filter);
-
-  return (features.length < 1)
-    ? false
-    : { type: "FeatureCollection", features: features };
-}
-
-function prepFilter(filterObj) {
+export function buildFeatureFilter(filterObj) {
   // filterObj is a filter definition following the "deprecated" syntax:
   // https://docs.mapbox.com/mapbox-gl-js/style-spec/#other-filter
   if (!filterObj) return () => true;
@@ -21,18 +9,18 @@ function prepFilter(filterObj) {
   [type, ...vals] = filterObj;
   switch (type) {
     case "all": {
-      let filters = vals.map(prepFilter);  // WARNING: Iteratively recursive!
+      let filters = vals.map(buildFeatureFilter);  // Iteratively recursive!
       return (d) => filters.every( filt => filt(d) );
     }
     case "any": {
-      let filters = vals.map(prepFilter);
+      let filters = vals.map(buildFeatureFilter);
       return (d) => filters.some( filt => filt(d) );
     }
     case "none": {
-      let filters = vals.map(prepFilter);
+      let filters = vals.map(buildFeatureFilter);
       return (d) => filters.every( filt => !filt(d) );
     }
-    // EMPTY DEFAULT BREAKS ROLLUP. Commented out for now.
+    // TODO: EMPTY DEFAULT BREAKS ROLLUP. Commented out for now.
     // See https://github.com/rollup/rollup/issues/3236
     //default: break; // Must be a simple filter
   }
