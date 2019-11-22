@@ -943,60 +943,12 @@ function geoStream(object, stream) {
   }
 }
 
-var areaRingSum = adder();
-
-var areaSum = adder();
-
-var deltaSum = adder();
-
-var sum = adder();
-
-function ascending(a, b) {
-  return a < b ? -1 : a > b ? 1 : a >= b ? 0 : NaN;
-}
-
-function bisector(compare) {
-  if (compare.length === 1) compare = ascendingComparator(compare);
-  return {
-    left: function(a, x, lo, hi) {
-      if (lo == null) lo = 0;
-      if (hi == null) hi = a.length;
-      while (lo < hi) {
-        var mid = lo + hi >>> 1;
-        if (compare(a[mid], x) < 0) lo = mid + 1;
-        else hi = mid;
-      }
-      return lo;
-    },
-    right: function(a, x, lo, hi) {
-      if (lo == null) lo = 0;
-      if (hi == null) hi = a.length;
-      while (lo < hi) {
-        var mid = lo + hi >>> 1;
-        if (compare(a[mid], x) > 0) hi = mid;
-        else lo = mid + 1;
-      }
-      return lo;
-    }
-  };
-}
-
-function ascendingComparator(f) {
-  return function(d, x) {
-    return ascending(f(d), x);
-  };
-}
-
-var ascendingBisect = bisector(ascending);
-
-var lengthSum = adder();
-
 function identity(x) {
   return x;
 }
 
-var areaSum$1 = adder(),
-    areaRingSum$1 = adder(),
+var areaSum = adder(),
+    areaRingSum = adder(),
     x00,
     y00,
     x0,
@@ -1012,12 +964,12 @@ var areaStream = {
   },
   polygonEnd: function() {
     areaStream.lineStart = areaStream.lineEnd = areaStream.point = noop;
-    areaSum$1.add(abs(areaRingSum$1));
-    areaRingSum$1.reset();
+    areaSum.add(abs(areaRingSum));
+    areaRingSum.reset();
   },
   result: function() {
-    var area = areaSum$1 / 2;
-    areaSum$1.reset();
+    var area = areaSum / 2;
+    areaSum.reset();
     return area;
   }
 };
@@ -1032,7 +984,7 @@ function areaPointFirst(x, y) {
 }
 
 function areaPoint(x, y) {
-  areaRingSum$1.add(y0 * x - x0 * y);
+  areaRingSum.add(y0 * x - x0 * y);
   x0 = x, y0 = y;
 }
 
@@ -1205,7 +1157,7 @@ PathContext.prototype = {
   result: noop
 };
 
-var lengthSum$1 = adder(),
+var lengthSum = adder(),
     lengthRing,
     x00$2,
     y00$2,
@@ -1228,8 +1180,8 @@ var lengthStream = {
     lengthRing = null;
   },
   result: function() {
-    var length = +lengthSum$1;
-    lengthSum$1.reset();
+    var length = +lengthSum;
+    lengthSum.reset();
     return length;
   }
 };
@@ -1241,7 +1193,7 @@ function lengthPointFirst(x, y) {
 
 function lengthPoint(x, y) {
   x0$3 -= x, y0$3 -= y;
-  lengthSum$1.add(sqrt(x0$3 * x0$3 + y0$3 * y0$3));
+  lengthSum.add(sqrt(x0$3 * x0$3 + y0$3 * y0$3));
   x0$3 = x, y0$3 = y;
 }
 
@@ -1734,9 +1686,6 @@ function buildFeatureFilter(filterObj) {
       let filters = vals.map(buildFeatureFilter);
       return (d) => filters.every( filt => !filt(d) );
     }
-    // TODO: EMPTY DEFAULT BREAKS ROLLUP. Commented out for now.
-    // See https://github.com/rollup/rollup/issues/3236
-    //default: break; // Must be a simple filter
   }
 
   [type, key, ...vals] = filterObj;
@@ -1793,22 +1742,21 @@ function initFeatureValGetter(key) {
   }
 }
 
-function initPainter(canvSize, style, sprite) {
-  // Input canvSize is an integer, for the pixel size of the (square) tiles
-  // Input style points to a layer from a Mapbox style document
-  //   Specification: https://docs.mapbox.com/mapbox-gl-js/style-spec/
-  // Input sprite (if defined) is an object with image and meta properties
+function initPainter(params) {
+  const style = params.styleLayer;
+  const sprite = params.spriteObject;
+  const canvasSize = params.canvasSize || 512;
 
   // Define data prep and rendering functions
   var getData, render;
   switch (style.type) {
     case "background":
       getData = () => true;
-      render = initBackgroundFill(style, canvSize);
+      render = initBackgroundFill(style, canvasSize);
       break;
     case "raster":
       getData = makeSourceGetter(style);
-      render = initRasterFill(style, canvSize);
+      render = initRasterFill(style, canvasSize);
       break;
     case "symbol":
       getData = makeFeatureGetter(style);
@@ -1827,7 +1775,7 @@ function initPainter(canvSize, style, sprite) {
   }
 
   // Compose into one function
-  return function(ctx, zoom, sources, boundingBoxes) {
+  return function(context, zoom, sources, boundingBoxes) {
     // Quick exits if this layer is not meant to be displayed
     // TODO: this is keeping alive the link back to the style document?
     if (style.layout && style.layout["visibility"] === "none") return false;
@@ -1839,12 +1787,12 @@ function initPainter(canvSize, style, sprite) {
     if (!data) return false;
 
     // Render
-    render(ctx, zoom, data, boundingBoxes);
+    render(context, zoom, data, boundingBoxes);
 
     // Restore Canvas state to starting point
-    ctx.restore();
+    context.restore();
     // Save the starting point again (restore removed the saved copy)
-    ctx.save();
+    context.save();
 
     // Return flag to indicate the canvas has changed
     return true;
@@ -1886,7 +1834,11 @@ function initRenderer(canvSize, styleLayers, styleGroups, sprite, chains) {
 
   // Parse the styles into rendering functions, attached to the styles
   styleLayers.forEach(layer => {
-    layer.painter = initPainter(canvSize, layer, sprite);
+    layer.painter = initPainter({
+      canvasSize: canvSize,
+      styleLayer: layer,
+      spriteObject: sprite,
+    });
   });
 
   // Sort styles into groups

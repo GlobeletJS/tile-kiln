@@ -1,4 +1,4 @@
-import { initPainter } from "./painter.js";
+import { initPainter } from 'tile-painter';
 
 export function initRenderer(canvSize, styleLayers, styleGroups, sprite, chains) {
   // Input canvSize is an integer, for the pixel size of the (square) tiles
@@ -10,7 +10,11 @@ export function initRenderer(canvSize, styleLayers, styleGroups, sprite, chains)
 
   // Parse the styles into rendering functions, attached to the styles
   styleLayers.forEach(layer => {
-    layer.painter = initPainter(canvSize, layer, sprite);
+    layer.painter = initPainter({
+      canvasSize: canvSize,
+      styleLayer: layer,
+      spriteObject: sprite,
+    });
   });
 
   // Sort styles into groups

@@ -1,7 +1,7 @@
 import { loadStyle } from "./style.js";
 import { initWorker } from "./boss.js";
 import { initTileFactory } from "./tile.js";
-import { initRenderer } from "./rendering/renderer.js";
+import { initRenderer } from "./renderer.js";
 import { initChainer } from "./chains.js";
 
 export function init(params) {

@@ -37,16 +37,15 @@
   "homepage": "https://github.com/globeletjs/tile-kiln#readme",
   "devDependencies": {
     "http-server": "^0.11.1",
-    "rollup": "^1.27.0",
+    "rollup": "^1.27.3",
     "rollup-plugin-commonjs": "^10.1.0",
     "rollup-plugin-json": "^4.0.0",
-    "rollup-plugin-node-resolve": "^4.2.4",
+    "rollup-plugin-node-resolve": "^5.2.0",
     "touch-sampler": "0.0.1"
   },
   "dependencies": {
-    "csscolorparser": "^1.0.3",
-    "d3-geo": "^1.11.6",
     "pbf": "^3.2.1",
+    "tile-painter": "0.0.1",
     "vector-tile-js": "github:jjhembd/vector-tile-js"
   }
 }
