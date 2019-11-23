@@ -1,3 +1,164 @@
+// Wrapper for worker threads to enable a callback interface
+// Inspired by https://codeburst.io/promises-for-the-web-worker-9311b7831733
+function initWorker(codeHref) {
+
+  const tasks = {};
+  let globalMsgId = 0;
+  let activeTasks = 0;
+
+  const worker = new Worker(codeHref);
+  worker.onmessage = handleMsg;
+
+  return {
+    startTask,
+    cancelTask,
+    numActive: () => activeTasks,
+    terminate: worker.terminate,
+  }
+
+  function startTask(payload, callback) {
+    activeTasks ++;
+    const msgId = globalMsgId++;
+    tasks[msgId] = { callback };
+    worker.postMessage({ id: msgId, type: "start", payload });
+    return msgId; // Returned ID can be used for later cancellation
+  }
+
+  function cancelTask(id) {
+    if (tasks[id]) worker.postMessage({ id, type: "cancel" });
+    return delete tasks[id];
+  }
+
+  function handleMsg(msgEvent) {
+    const msg = msgEvent.data; // { id, type, key, payload }
+    const task = tasks[msg.id];
+    if (!task) return worker.postMessage({ id: msg.id, type: "cancel" });
+
+    switch (msg.type) {
+      case "error":
+        task.callback(msg.payload);
+        break; // Clean up below
+
+      case "header":
+        task.header = msg.payload;
+        task.result = initJSON(msg.payload);
+        return worker.postMessage({ id: msg.id, type: "continue" });
+
+      case "data": 
+        let features = task.result[msg.key].features;
+        msg.payload.forEach( feature => features.push(feature) );
+        return worker.postMessage({ id: msg.id, type: "continue" });
+
+      case "done":
+        let err = checkJSON(task.result, task.header)
+          ? null
+          : "ERROR: JSON from worker failed checks!";
+        task.callback(err, task.result);
+        break; // Clean up below
+
+      default:
+        task.callback("ERROR: worker sent bad message type!");
+        break; // Clean up below
+    }
+
+    delete tasks[msg.id];
+    activeTasks --;
+  }
+}
+
+function initJSON(header) {
+  const json = {};
+  Object.keys(header).forEach(key => {
+    json[key] = { type: "FeatureCollection", features: [] };
+  });
+  return json;
+}
+
+function checkJSON(json, header) {
+  return Object.keys(header).every(checkFeatureCount);
+
+  function checkFeatureCount(key) {
+    return json[key].features.length === header[key];
+  }
+}
+
+function initChainer() {
+  const timeouts = [];
+
+  const messageName = "zero-timeout-message";
+  window.addEventListener("message", handleMessage, true);
+
+  return {
+    sortTasks,
+    chainSyncList,
+    chainAsyncList,
+  };
+
+  function sortTasks(ranking) {
+    // Rank each task according to the supplied ranking function
+    timeouts.forEach( task => { task.rank = ranking(task.id); } );
+    // Sort tasks: smaller rank number (or undefined rank) first
+    timeouts.sort( (a, b) => (a.rank > b.rank) ? 1 : -1 );
+  }
+
+  function chainSyncList(funcs, finalCallback, taskId) {
+    // Input funcs is an array of synchronous zero-argument functions
+    // Turn them into asynchronous functions taking a callback
+    const cbFuncs = funcs.map( func => (cb) => {
+      func();
+      setZeroTimeout(cb, taskId);
+    });
+
+    // Execute them as a chain. Start the chain asynchronously
+    setZeroTimeout( () => callInOrder(cbFuncs, finalCallback), taskId );
+  }
+
+  function chainAsyncList(funcs, finalCallback, taskId) {
+    // Input funcs is an array of functions taking a callback as an argument.
+    // Wrap them to make the callbacks asynchronous and ID'd
+    const wrapFuncs = funcs.map( func => (cb) => {
+      func( () => setZeroTimeout(cb, taskId) );
+    });
+
+    // Execute them as a chain. Start the chain asynchronously
+    setZeroTimeout( () => callInOrder(wrapFuncs, finalCallback), taskId );
+  }
+
+  // http://derpturkey.com/chained-callback-pattern-in-javascript/
+  function callInOrder(funcs, finalCallback) {
+    funcs.push(finalCallback);
+    chain(funcs.shift());
+
+    function chain(func) {
+      if (func) func( () => chain(funcs.shift()) );
+    }
+  }
+
+  // https://dbaron.org/log/20100309-faster-timeouts
+  // func is a function taking zero arguments
+  function setZeroTimeout(func, id) {
+    timeouts.push({ id, func, rank: 0 });
+
+    // Don't let this message be picked up by another window:
+    // set the targetOrigin to the current window origin
+    let loc = window.location;
+    let targetOrigin = loc.protocol + "//" + loc.hostname;
+    if (loc.port !== "") targetOrigin += ":" + loc.port;
+
+    window.postMessage(messageName, targetOrigin);
+  }
+
+  function handleMessage(evnt) {
+    if (evnt.source != window || evnt.data !== messageName) return;
+    evnt.stopPropagation();
+    if (timeouts.length < 1) return;
+
+    let task = timeouts.shift();
+    // If task rank is undefined, this task has been canceled.
+    if (task.rank !== undefined) task.func();
+  }
+}
+
 function getJSON(dataHref) {
   // Wrap the fetch API to force a rejected promise if response is not OK
   const checkResponse = (response) => (response.ok)
@@ -1607,88 +1768,45 @@ function expandSource(key, sources, token) {
   }
 }
 
-// Wrapper for worker threads to enable a callback interface
-// Inspired by https://codeburst.io/promises-for-the-web-worker-9311b7831733
-function initWorker(codeHref) {
+function initGroups(styleDoc) {
+  // Filter to confirm an array element is not equal to the previous element
+  const uniq = (x, i, a) => ( !i || x !== a[i-1] );
 
-  const tasks = {};
-  let globalMsgId = 0;
-  let activeTasks = 0;
+  const groupNames = styleDoc.layers
+    .map( layer => layer["tilekiln-group"] || "none" )
+    .filter(uniq);
 
-  const worker = new Worker(codeHref);
-  worker.onmessage = handleMsg;
-
-  return {
-    startTask,
-    cancelTask,
-    numActive: () => activeTasks,
-    terminate: worker.terminate,
+  // Make sure the groups are in order, not interleaved
+  const groupCheck = groupNames.slice().sort().filter(uniq);
+  if (groupCheck.length !== groupNames.length) {
+    // TODO: assumes we are calling from a Promise chain?
+    throw Error("tile-kiln setup: Input layer groups are not in order!");
   }
 
-  function startTask(payload, callback) {
-    activeTasks ++;
-    const msgId = globalMsgId++;
-    tasks[msgId] = { callback };
-    worker.postMessage({ id: msgId, type: "start", payload });
-    return msgId; // Returned ID can be used for later cancellation
-  }
-
-  function cancelTask(id) {
-    if (tasks[id]) worker.postMessage({ id, type: "cancel" });
-    return delete tasks[id];
-  }
-
-  function handleMsg(msgEvent) {
-    const msg = msgEvent.data; // { id, type, key, payload }
-    const task = tasks[msg.id];
-    if (!task) return worker.postMessage({ id: msg.id, type: "cancel" });
-
-    switch (msg.type) {
-      case "error":
-        task.callback(msg.payload);
-        break; // Clean up below
-
-      case "header":
-        task.header = msg.payload;
-        task.result = initJSON(msg.payload);
-        return worker.postMessage({ id: msg.id, type: "continue" });
-
-      case "data": 
-        let features = task.result[msg.key].features;
-        msg.payload.forEach( feature => features.push(feature) );
-        return worker.postMessage({ id: msg.id, type: "continue" });
-
-      case "done":
-        let err = checkJSON(task.result, task.header)
-          ? null
-          : "ERROR: JSON from worker failed checks!";
-        task.callback(err, task.result);
-        break; // Clean up below
-
-      default:
-        task.callback("ERROR: worker sent bad message type!");
-        break; // Clean up below
-    }
-
-    delete tasks[msg.id];
-    activeTasks --;
-  }
-}
-
-function initJSON(header) {
-  const json = {};
-  Object.keys(header).forEach(key => {
-    json[key] = { type: "FeatureCollection", features: [] };
+  // For each group name, collect the layers from the style document, and
+  // add a visibility property
+  const groups = groupNames.map( name => {
+    return {
+      name,
+      visible: true,
+      layers: sortStyleGroup(styleDoc.layers, name),
+    };
   });
-  return json;
+
+  return groups;
 }
 
-function checkJSON(json, header) {
-  return Object.keys(header).every(checkFeatureCount);
+function sortStyleGroup(layers, groupName) {
+  // Get the layers belonging to this group
+  var group = (groupName !== "none")
+    ? layers.filter(layer => layer["tilekiln-group"] === groupName)
+    : layers.filter(layer => !layer["tilekiln-group"]);
 
-  function checkFeatureCount(key) {
-    return json[key].features.length === header[key];
-  }
+  // Reverse the order of the symbol layers
+  var labels = group.filter(layer => layer.type === "symbol").reverse();
+
+  // Append reordered symbol layers to non-symbol layers
+  return group.filter(layer => layer.type !== "symbol").concat(labels);
 }
 
 var utf8TextDecoder = typeof TextDecoder === 'undefined' ? null : new TextDecoder('utf8');
@@ -1803,18 +1921,8 @@ function tileURL(endpoint, z, x, y) {
   return endpoint.replace(/{z}/, z).replace(/{x}/, x).replace(/{y}/, y);
 }
 
-function initRenderer(canvSize, styleLayers, styleGroups, chains) {
+function initRenderer(canvSize, styleGroups, chains) {
   // Input canvSize is an integer, for the pixel size of the (square) tiles
-  // Input styleLayers points to the .layers property of a Mapbox style document
-  //   Specification: https://docs.mapbox.com/mapbox-gl-js/style-spec/
-  // Input styleGroups is a list of style layer groups identified by a
-  //   "tilekiln-group" property of each layer
-
-  // Sort styles into groups
-  const styles = {};
-  styleGroups.forEach( group => {
-    styles[group.name] = sortStyleGroup(styleLayers, group.name);
-  });
 
   var getLamina, composite;
   if (styleGroups.length > 1) { 
@@ -1840,9 +1948,8 @@ function initRenderer(canvSize, styleLayers, styleGroups, chains) {
     composite,
   };
 
-  function drawGroup(tile, groupName = "none", callback = () => undefined) {
-    if (!styles[groupName]) return callback(null, tile);
-    let lamina = getLamina(tile, groupName);
+  function drawGroup(tile, layerGroup, callback = () => undefined) {
+    let lamina = getLamina(tile, layerGroup.name);
     if (lamina.rendered) return callback(null, tile);
 
     lamina.ctx.clearRect(0, 0, canvSize, canvSize);
@@ -1850,7 +1957,7 @@ function initRenderer(canvSize, styleLayers, styleGroups, chains) {
 
     // Draw the layers: asynchronously, but in order
     // Create a chain of functions, one for each layer.
-    const drawCalls = styles[groupName].map(layer => {
+    const drawCalls = layerGroup.layers.map(layer => {
       return () => layer.painter(lamina.ctx, tile.z, tile.sources, boundingBoxes);
     });
     // Execute the chain, with copyResult as the final callback
@@ -1863,96 +1970,6 @@ function initRenderer(canvSize, styleLayers, styleGroups, chains) {
   }
 }
 
-function sortStyleGroup(layers, groupName) {
-  // Get the layers belonging to this group
-  var group = (groupName === "none")
-    ? layers.filter(layer => !layer["tilekiln-group"]) // Layers with no group specified
-    : layers.filter(layer => layer["tilekiln-group"] === groupName);
-
-  // Reverse the order of the symbol layers
-  var labels = group.filter(layer => layer.type === "symbol").reverse();
-
-  // Append reordered symbol layers to non-symbol layers
-  return group.filter(layer => layer.type !== "symbol").concat(labels);
-}
-
-function initChainer() {
-  const timeouts = [];
-
-  const messageName = "zero-timeout-message";
-  window.addEventListener("message", handleMessage, true);
-
-  return {
-    sortTasks,
-    chainSyncList,
-    chainAsyncList,
-  };
-
-  function sortTasks(ranking) {
-    // Rank each task according to the supplied ranking function
-    timeouts.forEach( task => { task.rank = ranking(task.id); } );
-    // Sort tasks: smaller rank number (or undefined rank) first
-    timeouts.sort( (a, b) => (a.rank > b.rank) ? 1 : -1 );
-  }
-
-  function chainSyncList(funcs, finalCallback, taskId) {
-    // Input funcs is an array of synchronous zero-argument functions
-    // Turn them into asynchronous functions taking a callback
-    const cbFuncs = funcs.map( func => (cb) => {
-      func();
-      setZeroTimeout(cb, taskId);
-    });
-
-    // Execute them as a chain. Start the chain asynchronously
-    setZeroTimeout( () => callInOrder(cbFuncs, finalCallback), taskId );
-  }
-
-  function chainAsyncList(funcs, finalCallback, taskId) {
-    // Input funcs is an array of functions taking a callback as an argument.
-    // Wrap them to make the callbacks asynchronous and ID'd
-    const wrapFuncs = funcs.map( func => (cb) => {
-      func( () => setZeroTimeout(cb, taskId) );
-    });
-
-    // Execute them as a chain. Start the chain asynchronously
-    setZeroTimeout( () => callInOrder(wrapFuncs, finalCallback), taskId );
-  }
-
-  // http://derpturkey.com/chained-callback-pattern-in-javascript/
-  function callInOrder(funcs, finalCallback) {
-    funcs.push(finalCallback);
-    chain(funcs.shift());
-
-    function chain(func) {
-      if (func) func( () => chain(funcs.shift()) );
-    }
-  }
-
-  // https://dbaron.org/log/20100309-faster-timeouts
-  // func is a function taking zero arguments
-  function setZeroTimeout(func, id) {
-    timeouts.push({ id, func, rank: 0 });
-
-    // Don't let this message be picked up by another window:
-    // set the targetOrigin to the current window origin
-    let loc = window.location;
-    let targetOrigin = loc.protocol + "//" + loc.hostname;
-    if (loc.port !== "") targetOrigin += ":" + loc.port;
-
-    window.postMessage(messageName, targetOrigin);
-  }
-
-  function handleMessage(evnt) {
-    if (evnt.source != window || evnt.data !== messageName) return;
-    evnt.stopPropagation();
-    if (timeouts.length < 1) return;
-
-    let task = timeouts.shift();
-    // If task rank is undefined, this task has been canceled.
-    if (task.rank !== undefined) task.func();
-  }
-}
-
 function init(params) {
   // Process parameters, substituting defaults as needed
   var canvSize = params.size || 512;
@@ -1961,7 +1978,7 @@ function init(params) {
   var callback = params.callback || ( () => undefined );
 
   // Declare some variables & methods that will be defined inside a callback
-  var groupNames, tileFactory, renderer, t0, t1, t2;
+  var tileFactory, renderer, t0, t1, t2;
   var styleGroups = [];
   var activeDrawCalls = 0;
 
@@ -1978,7 +1995,6 @@ function init(params) {
 
   const api = { // Initialize properties, update when styles load
     style: {},    // WARNING: directly modifiable from calling program
-    groups: [],
 
     create: () => undefined,
     hideGroup: (name) => setGroupVisibility(name, false),
@@ -1998,30 +2014,11 @@ function init(params) {
   function setup(err, styleDoc) {
     if (err) callback(err);
 
-    // Get layer group names from styleDoc
-    groupNames = styleDoc.layers
-      .map( layer => layer["tilekiln-group"] || "none" )
-      .filter(uniq);
-
-    // Make sure the groups are in order, not interleaved
-    var groupCheck = groupNames.slice().sort().filter(uniq);
-    if (groupNames.length !== groupCheck.length) {
-      err = "tile-kiln setup: Input layer groups are not in order!";
-      return callback(err);
-    }
-    
-    function uniq(x, i, a) {
-      return ( !i || x !== a[i-1] ); // x is not a repeat of the previous value
-    }
-
-    // Construct an object to track visibility of each group
-    styleGroups = groupNames.map( name => {
-      return { name, visible: true };
-    });
+    styleGroups = initGroups(styleDoc);
 
     tileFactory = initTileFactory(canvSize, styleDoc.sources, 
       styleGroups, readThread);
-    renderer = initRenderer(canvSize, styleDoc.layers, styleGroups, chains);
+    renderer = initRenderer(canvSize, styleGroups, chains);
 
     // Update api
     // TODO: we could initialize renderer without styles, then send it the
@@ -2030,7 +2027,6 @@ function init(params) {
     api.create = create;
 
     api.redraw = drawAll;
-    api.groups = groupNames;
     api.ready = true;
 
     return callback(null, api);
@@ -2080,7 +2076,7 @@ function init(params) {
           check(err, tile, group.name);
           cb();
         };
-        renderer.drawGroup(tile, group.name, checkCb);
+        renderer.drawGroup(tile, group, checkCb);
       };
     }
 

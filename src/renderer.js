@@ -1,15 +1,5 @@
-export function initRenderer(canvSize, styleLayers, styleGroups, chains) {
+export function initRenderer(canvSize, styleGroups, chains) {
   // Input canvSize is an integer, for the pixel size of the (square) tiles
-  // Input styleLayers points to the .layers property of a Mapbox style document
-  //   Specification: https://docs.mapbox.com/mapbox-gl-js/style-spec/
-  // Input styleGroups is a list of style layer groups identified by a
-  //   "tilekiln-group" property of each layer
-
-  // Sort styles into groups
-  const styles = {};
-  styleGroups.forEach( group => {
-    styles[group.name] = sortStyleGroup(styleLayers, group.name);
-  });
 
   var getLamina, composite;
   if (styleGroups.length > 1) { 
@@ -35,9 +25,8 @@ export function initRenderer(canvSize, styleLayers, styleGroups, chains) {
     composite,
   };
 
-  function drawGroup(tile, groupName = "none", callback = () => undefined) {
-    if (!styles[groupName]) return callback(null, tile);
-    let lamina = getLamina(tile, groupName);
+  function drawGroup(tile, layerGroup, callback = () => undefined) {
+    let lamina = getLamina(tile, layerGroup.name);
     if (lamina.rendered) return callback(null, tile);
 
     lamina.ctx.clearRect(0, 0, canvSize, canvSize);
@@ -45,7 +34,7 @@ export function initRenderer(canvSize, styleLayers, styleGroups, chains) {
 
     // Draw the layers: asynchronously, but in order
     // Create a chain of functions, one for each layer.
-    const drawCalls = styles[groupName].map(layer => {
+    const drawCalls = layerGroup.layers.map(layer => {
       return () => layer.painter(lamina.ctx, tile.z, tile.sources, boundingBoxes);
     });
     // Execute the chain, with copyResult as the final callback
@@ -56,17 +45,4 @@ export function initRenderer(canvSize, styleLayers, styleGroups, chains) {
       return callback(null, tile);
     }
   }
-}
-
-function sortStyleGroup(layers, groupName) {
-  // Get the layers belonging to this group
-  var group = (groupName === "none")
-    ? layers.filter(layer => !layer["tilekiln-group"]) // Layers with no group specified
-    : layers.filter(layer => layer["tilekiln-group"] === groupName);
-
-  // Reverse the order of the symbol layers
-  var labels = group.filter(layer => layer.type === "symbol").reverse();
-
-  // Append reordered symbol layers to non-symbol layers
-  return group.filter(layer => layer.type !== "symbol").concat(labels);
 }

@@ -1,8 +1,9 @@
-import { loadStyle } from "./style.js";
 import { initWorker } from "./boss.js";
+import { initChainer } from "./chains.js";
+import { loadStyle } from "./style.js";
+import { initGroups } from "./groups.js";
 import { initTileFactory } from "./tile.js";
 import { initRenderer } from "./renderer.js";
-import { initChainer } from "./chains.js";
 
 export function init(params) {
   // Process parameters, substituting defaults as needed
@@ -12,7 +13,7 @@ export function init(params) {
   var callback = params.callback || ( () => undefined );
 
   // Declare some variables & methods that will be defined inside a callback
-  var groupNames, tileFactory, renderer, t0, t1, t2;
+  var tileFactory, renderer, t0, t1, t2;
   var styleGroups = [];
   var activeDrawCalls = 0;
 
@@ -29,7 +30,6 @@ export function init(params) {
 
   const api = { // Initialize properties, update when styles load
     style: {},    // WARNING: directly modifiable from calling program
-    groups: [],
 
     create: () => undefined,
     hideGroup: (name) => setGroupVisibility(name, false),
@@ -49,30 +49,11 @@ export function init(params) {
   function setup(err, styleDoc) {
     if (err) callback(err);
 
-    // Get layer group names from styleDoc
-    groupNames = styleDoc.layers
-      .map( layer => layer["tilekiln-group"] || "none" )
-      .filter(uniq);
-
-    // Make sure the groups are in order, not interleaved
-    var groupCheck = groupNames.slice().sort().filter(uniq);
-    if (groupNames.length !== groupCheck.length) {
-      err = "tile-kiln setup: Input layer groups are not in order!";
-      return callback(err);
-    }
-    
-    function uniq(x, i, a) {
-      return ( !i || x !== a[i-1] ); // x is not a repeat of the previous value
-    }
-
-    // Construct an object to track visibility of each group
-    styleGroups = groupNames.map( name => {
-      return { name, visible: true };
-    });
+    styleGroups = initGroups(styleDoc);
 
     tileFactory = initTileFactory(canvSize, styleDoc.sources, 
       styleGroups, readThread);
-    renderer = initRenderer(canvSize, styleDoc.layers, styleGroups, chains);
+    renderer = initRenderer(canvSize, styleGroups, chains);
 
     // Update api
     // TODO: we could initialize renderer without styles, then send it the
@@ -81,7 +62,6 @@ export function init(params) {
     api.create = create;
 
     api.redraw = drawAll;
-    api.groups = groupNames;
     api.ready = true;
 
     return callback(null, api);
@@ -131,7 +111,7 @@ export function init(params) {
           check(err, tile, group.name);
           cb();
         };
-        renderer.drawGroup(tile, group.name, checkCb);
+        renderer.drawGroup(tile, group, checkCb);
       };
     }
 
