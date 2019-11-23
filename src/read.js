@@ -43,29 +43,6 @@ function layerToJSON(layer, size) {
   return { type: "FeatureCollection", features: features };
 }
 
-export function readMultiJSON(hrefs, callback) {
-  var results = {};
-  hrefs.forEach( href => readJSON(href, checkAll) );
-
-  function checkAll(err, data, href) {
-    if (err) callback(err);
-    results[href] = data;
-    if (Object.keys(results).length === hrefs.length) callback(null, results);
-  }
-}
-
-export function readJSON(dataHref, callback) {
-  // Input dataHref is the path to a file containing JSON
-
-  // Request the data - as text, since Edge doesn't support json responseType
-  xhrGet(dataHref, "text", parseJSON);
-
-  function parseJSON(err, data) {
-    if (err) return callback(err, data);
-    callback(null, JSON.parse(data), dataHref);
-  }
-}
-
 export function loadImage(href, callback) {
   const img = new Image();
   img.onerror = () => callback("ERROR in loadImage for href " + href);
