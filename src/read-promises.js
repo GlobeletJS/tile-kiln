@@ -1,7 +1,7 @@
 export function getJSON(dataHref) {
   // Wrap the fetch API to force a rejected promise if response is not OK
   const checkResponse = (response) => (response.ok)
-    ? response.json()  // TODO: does this work on Safari??
+    ? response.json()
     : Promise.reject(response); // Can check .status on returned response
 
   return fetch(dataHref).then(checkResponse);

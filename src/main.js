@@ -42,7 +42,7 @@ export function init(params) {
   };
 
   // Get the style info
-  loadStyle(styleURL, mbToken, setup);
+  loadStyle(styleURL, mbToken, canvSize, setup);
 
   return api;
 
@@ -72,8 +72,7 @@ export function init(params) {
 
     tileFactory = initTileFactory(canvSize, styleDoc.sources, 
       styleGroups, readThread);
-    renderer = initRenderer(canvSize, styleDoc.layers, 
-      styleGroups, styleDoc.spriteData, chains);
+    renderer = initRenderer(canvSize, styleDoc.layers, styleGroups, chains);
 
     // Update api
     // TODO: we could initialize renderer without styles, then send it the

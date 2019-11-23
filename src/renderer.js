@@ -1,21 +1,9 @@
-import { initPainter } from 'tile-painter';
-
-export function initRenderer(canvSize, styleLayers, styleGroups, sprite, chains) {
+export function initRenderer(canvSize, styleLayers, styleGroups, chains) {
   // Input canvSize is an integer, for the pixel size of the (square) tiles
   // Input styleLayers points to the .layers property of a Mapbox style document
   //   Specification: https://docs.mapbox.com/mapbox-gl-js/style-spec/
   // Input styleGroups is a list of style layer groups identified by a
   //   "tilekiln-group" property of each layer
-  // Input sprite (if defined) is an object with image and meta properties
-
-  // Parse the styles into rendering functions, attached to the styles
-  styleLayers.forEach(layer => {
-    layer.painter = initPainter({
-      canvasSize: canvSize,
-      styleLayer: layer,
-      spriteObject: sprite,
-    });
-  });
 
   // Sort styles into groups
   const styles = {};

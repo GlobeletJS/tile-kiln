@@ -1,30 +1,49 @@
 import { getJSON, getImage } from "./read-promises.js";
-import { derefLayers } from "./deref.js";
+import { expandLayerReferences } from "./deref.js";
 import { expandStyleURL, expandSpriteURLs, expandTileURL } from "./mapbox.js";
+import { initPainter } from 'tile-painter';
 
-export function loadStyle(style, mapboxToken, callback) {
+export function loadStyle(style, mbToken, canvasSize, callback) {
+
+  // Get a Promise that resolves to a Mapbox style document
   const getStyleJson = (typeof style === "object")
     ? Promise.resolve(style)                // style is JSON already
-    : getJSON( expandStyleURL(style, mapboxToken) ); // Get from URL
+    : getJSON( expandStyleURL(style, mbToken) ); // Get from URL
 
+
+  // Now set up a Promise chain to process the document
   return getStyleJson
-    .then(json => {
-      json.layers = derefLayers(json.layers);
-      return json;
-    })
-    .then(expandedJson => prepStyle(expandedJson, mapboxToken))
-    .then(preppedStyle => callback(null, preppedStyle))
+    .then( expandLayerReferences )
+
+    .then( retrieveSourceInfo )
+
+    .then( addPainterFunctions )
+
+    .then(finalStyle => callback(null, finalStyle))
     .catch(err => callback(err));
-}
 
-function prepStyle(styleDoc, token) {
-  const expandSources = Object.keys(styleDoc.sources)
-    .map(key => expandSource(key, styleDoc.sources, token));
 
-  const getSprite = loadSprite(styleDoc, token);
+  function retrieveSourceInfo(styleDoc) {
+    const getSprite = loadSprite(styleDoc, mbToken);
 
-  return Promise.all([...expandSources, getSprite])
-    .then(() => styleDoc);
+    const expandSources = Object.keys(styleDoc.sources)
+      .map(key => expandSource(key, styleDoc.sources, mbToken));
+
+    return Promise.all([...expandSources, getSprite])
+      .then(() => styleDoc);
+  }
+
+  function addPainterFunctions(styleDoc) {
+    styleDoc.layers.forEach(layer => {
+      layer.painter = initPainter({
+        canvasSize: canvasSize,
+        styleLayer: layer,
+        spriteObject: styleDoc.spriteData,
+      });
+    });
+
+    return styleDoc;
+  }
 }
 
 function loadSprite(styleDoc, token) {
