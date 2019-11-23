@@ -1,5 +1,10 @@
-export function initRenderer(canvSize, styleGroups, chains) {
+import { initChainer } from "./chains.js";
+
+export function initRenderer(canvSize, styleGroups) {
   // Input canvSize is an integer, for the pixel size of the (square) tiles
+  var activeDrawCalls = 0;
+
+  const chains = initChainer();
 
   var getLamina, composite;
   if (styleGroups.length > 1) { 
@@ -21,9 +26,48 @@ export function initRenderer(canvSize, styleGroups, chains) {
   }
 
   return {
-    drawGroup,
-    composite,
+    draw: drawAll,
+    activeDrawCalls: () => activeDrawCalls,
   };
+
+  function drawAll(tile, callback = () => true, verbose) {
+    if (tile.canceled || !tile.loaded) return;
+    if (tile.rendered || tile.rendering) return; // Duplicate call?
+
+    // Flag this tile as in the process of rendering
+    tile.rendering = true;
+    activeDrawCalls ++;
+
+    // Make a chain of functions to draw each group
+    const drawCalls = styleGroups.filter(grp => grp.visible).map(makeDrawCall);
+
+    function makeDrawCall(group) {
+      // Wrap a drawGroup call to take only a callback as an argument
+      return (cb) => {
+        // Modify the callback to check the tile first
+        let checkCb = (err, tile) => (check(err, tile, group.name), cb());
+        drawGroup(tile, group, checkCb);
+      };
+    }
+
+    // Execute the chain, with putTogether as the final callback
+    chains.chainAsyncList(drawCalls, putTogether, tile.id);
+
+    function check(err, tile, groupName) {
+      if (err) return callback(err);
+      if (verbose) callback("progress", groupName);
+    }
+
+    function putTogether() {
+      composite(tile);
+
+      tile.rendered = true;
+      tile.rendering = false;
+      activeDrawCalls --;
+
+      return callback(null, tile);
+    }
+  }
 
   function drawGroup(tile, layerGroup, callback = () => undefined) {
     let lamina = getLamina(tile, layerGroup.name);
