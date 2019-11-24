@@ -82,31 +82,6 @@ function checkJSON(json, header) {
   }
 }
 
-function getJSON(dataHref) {
-  // Wrap the fetch API to force a rejected promise if response is not OK
-  const checkResponse = (response) => (response.ok)
-    ? response.json()
-    : Promise.reject(response); // Can check .status on returned response
-
-  return fetch(dataHref).then(checkResponse);
-}
-
-function getImage(href) {
-  const errMsg = "ERROR in getImage for href " + href;
-  const img = new Image();
-
-  return new Promise( (resolve, reject) => {
-    img.onerror = () => reject(errMsg);
-
-    img.onload = () => (img.complete && img.naturalWidth !== 0)
-        ? resolve(img)
-        : reject(errMsg);
-
-    img.crossOrigin = "anonymous";
-    img.src = href;
-  });
-}
-
 // From mapbox-gl-js, style-spec/deref.js
 const refProperties = [
   'type', 
@@ -195,6 +170,31 @@ function expandTileURL(url, token) {
   if ( !url.match(prefix) ) return url;
   var apiRoot = "https://api.mapbox.com/v4/";
   return url.replace(prefix, apiRoot) + ".json?secure&access_token=" + token;
+}
+
+function getJSON(dataHref) {
+  // Wrap the fetch API to force a rejected promise if response is not OK
+  const checkResponse = (response) => (response.ok)
+    ? response.json()
+    : Promise.reject(response); // Can check .status on returned response
+
+  return fetch(dataHref).then(checkResponse);
+}
+
+function getImage(href) {
+  const errMsg = "ERROR in getImage for href " + href;
+  const img = new Image();
+
+  return new Promise( (resolve, reject) => {
+    img.onerror = () => reject(errMsg);
+
+    img.onload = () => (img.complete && img.naturalWidth !== 0)
+        ? resolve(img)
+        : reject(errMsg);
+
+    img.crossOrigin = "anonymous";
+    img.src = href;
+  });
 }
 
 function createCommonjsModule(fn, module) {
@@ -1623,7 +1623,7 @@ function makeFeatureGetter(style) {
   }
 }
 
-function loadStyle(style, mbToken, canvasSize, callback) {
+function loadStyle(style, mbToken, canvasSize) {
 
   // Get a Promise that resolves to a Mapbox style document
   const getStyleJson = (typeof style === "object")
@@ -1637,10 +1637,7 @@ function loadStyle(style, mbToken, canvasSize, callback) {
 
     .then( retrieveSourceInfo )
 
-    .then( addPainterFunctions )
-
-    .then(finalStyle => callback(null, finalStyle))
-    .catch(err => callback(err));
+    .then( addPainterFunctions );
 
 
   function retrieveSourceInfo(styleDoc) {
@@ -2045,13 +2042,13 @@ function init(params) {
   };
 
   // Get the style info
-  loadStyle(styleURL, mbToken, canvSize, setup);
+  loadStyle(styleURL, mbToken, canvSize)
+    .then( setup )
+    .catch(err => callback(err));
 
   return api;
 
-  function setup(err, styleDoc) {
-    if (err) callback(err);
-
+  function setup(styleDoc) {
     styleGroups = initGroups(styleDoc);
 
     tileFactory = initTileFactory(canvSize, styleDoc.sources, 

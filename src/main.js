@@ -1,5 +1,5 @@
 import { initWorker } from "./boss.js";
-import { loadStyle } from "./style.js";
+import { loadStyle } from "./style/style.js";
 import { initGroups } from "./groups.js";
 import { initTileFactory } from "./tile.js";
 import { initRenderer } from "./renderer.js";
@@ -37,13 +37,13 @@ export function init(params) {
   };
 
   // Get the style info
-  loadStyle(styleURL, mbToken, canvSize, setup);
+  loadStyle(styleURL, mbToken, canvSize)
+    .then( setup )
+    .catch(err => callback(err));
 
   return api;
 
-  function setup(err, styleDoc) {
-    if (err) callback(err);
-
+  function setup(styleDoc) {
     styleGroups = initGroups(styleDoc);
 
     tileFactory = initTileFactory(canvSize, styleDoc.sources, 

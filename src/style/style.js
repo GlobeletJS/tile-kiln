@@ -1,9 +1,9 @@
-import { getJSON, getImage } from "./read-promises.js";
 import { expandLayerReferences } from "./deref.js";
 import { expandStyleURL, expandSpriteURLs, expandTileURL } from "./mapbox.js";
+import { getJSON, getImage } from "./read.js";
 import { initPainter } from 'tile-painter';
 
-export function loadStyle(style, mbToken, canvasSize, callback) {
+export function loadStyle(style, mbToken, canvasSize) {
 
   // Get a Promise that resolves to a Mapbox style document
   const getStyleJson = (typeof style === "object")
@@ -17,10 +17,7 @@ export function loadStyle(style, mbToken, canvasSize, callback) {
 
     .then( retrieveSourceInfo )
 
-    .then( addPainterFunctions )
-
-    .then(finalStyle => callback(null, finalStyle))
-    .catch(err => callback(err));
+    .then( addPainterFunctions );
 
 
   function retrieveSourceInfo(styleDoc) {
