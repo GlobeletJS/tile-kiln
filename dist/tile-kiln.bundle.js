@@ -1729,22 +1729,18 @@ function sortStyleGroup(layers, groupName) {
   return group.filter(layer => layer.type !== "symbol").concat(labels);
 }
 
-var utf8TextDecoder = typeof TextDecoder === 'undefined' ? null : new TextDecoder('utf8');
-
 function loadImage(href, callback) {
+  const errMsg = "ERROR in loadImage for href " + href;
   const img = new Image();
-  img.onerror = () => callback("ERROR in loadImage for href " + href);
-  img.onload = checkImg;
+
+  img.onerror = () => callback(errMsg);
+
+  img.onload = () => (img.complete && img.naturalWidth !== 0)
+    ? callback(null, img)
+    : callback(errMsg);
+
   img.crossOrigin = "anonymous";
   img.src = href;
-
-  function checkImg() {
-    if (img.complete && img.naturalWidth !== 0) {
-      return callback(null, img);
-    } else {
-      return callback("ERROR in loadImage for href " + href);
-    }
-  }
 
   return img;
 }

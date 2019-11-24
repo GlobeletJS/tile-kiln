@@ -1,4 +1,4 @@
-import { loadImage } from "./read.js";
+import { loadImage } from "./image.js";
 
 export function initTileFactory(size, sources, styleGroups, loader) {
   // Input size is the pixel size of the canvas used for vector rendering

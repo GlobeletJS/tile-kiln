@@ -1389,11 +1389,9 @@ function readMVT(dataHref, size, callback) {
   function parseMVT(err, data) {
     if (err) return callback(err, data);
 
-    //console.time('parseMVT');
     const pbuffer = new pbf( new Uint8Array(data) );
     const tile = new VectorTile(pbuffer);
     const jsonLayers = mvtToJSON(tile, size);
-    //console.timeEnd('parseMVT');
 
     callback(null, jsonLayers);
   }
@@ -1405,16 +1403,15 @@ function mvtToJSON(tile, size) {
   // But this is not mentioned in the spec! So we use layer.name for safety
   const jsonLayers = {};
   Object.values(tile.layers).forEach(layer => {
-      jsonLayers[layer.name] = layerToJSON(layer, size);
+    jsonLayers[layer.name] = layerToJSON(layer, size);
   });
   return jsonLayers;
 }
 
 function layerToJSON(layer, size) {
-  const features = [];
-  for (let i = 0; i < layer.length; ++i) {
-    features.push( layer.feature(i).toGeoJSON(size) );
-  }
+  const getFeature = (i) => layer.feature(i).toGeoJSON(size);
+  const features = Array.from(Array(layer.length), (v, i) => getFeature(i));
+
   return { type: "FeatureCollection", features: features };
 }
 

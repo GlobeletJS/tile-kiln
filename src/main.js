@@ -1,4 +1,4 @@
-import { initWorker } from "./boss.js";
+import { initWorker } from "./load-mvt/boss.js";
 import { loadStyle } from "./style/style.js";
 import { initGroups } from "./groups.js";
 import { initTileFactory } from "./tile.js";

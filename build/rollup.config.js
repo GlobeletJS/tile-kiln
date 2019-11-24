@@ -15,7 +15,7 @@ export default [{
     name: pkg.name
   }
 }, {
-  input: 'src/worker.js',
+  input: 'src/load-mvt/worker.js',
   plugins: [
     resolve(),
     commonjs(),
