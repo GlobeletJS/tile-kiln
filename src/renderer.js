@@ -1,10 +1,10 @@
-import { initChainer } from "./chains.js";
+import { initChunkQueue } from "./queue/chunks.js";
 
 export function initRenderer(canvSize, styleGroups) {
   // Input canvSize is an integer, for the pixel size of the (square) tiles
   var activeDrawCalls = 0;
 
-  const chains = initChainer();
+  const queue = initChunkQueue();
 
   var getLamina, composite;
   if (styleGroups.length > 1) { 
@@ -28,6 +28,7 @@ export function initRenderer(canvSize, styleGroups) {
   return {
     draw: drawAll,
     activeDrawCalls: () => activeDrawCalls,
+    sortTasks: queue.sortTasks,
   };
 
   function drawAll(tile, callback = () => true, verbose) {
@@ -38,24 +39,26 @@ export function initRenderer(canvSize, styleGroups) {
     tile.rendering = true;
     activeDrawCalls ++;
 
-    // Make a chain of functions to draw each group
-    const drawCalls = styleGroups.filter(grp => grp.visible).map(makeDrawCall);
+    // Make an array of functions to draw all the layers of every group
+    const drawCalls = [];
+    styleGroups
+      .filter(grp => grp.visible)
+      .forEach( group => drawCalls.push(...makeDrawCalls(group)) );
+    drawCalls.push(putTogether);
 
-    function makeDrawCall(group) {
-      // Wrap a drawGroup call to take only a callback as an argument
-      return (cb) => {
-        // Modify the callback to check the tile first
-        let checkCb = (err, tile) => (check(err, tile, group.name), cb());
-        drawGroup(tile, group, checkCb);
-      };
-    }
+    // Submit this array to the task queue
+    let renderTaskId = queue.enqueueTask({
+      chunks: drawCalls,
+      getPriority: () => tile.priority,
+    });
 
-    // Execute the chain, with putTogether as the final callback
-    chains.chainAsyncList(drawCalls, putTogether, tile.id);
+    // Tell the tile how to cancel the render task
+    tile.storeCanceler(() => queue.cancelTask(renderTaskId));
 
-    function check(err, tile, groupName) {
-      if (err) return callback(err);
-      if (verbose) callback("progress", groupName);
+    function makeDrawCalls(group) {
+      let drawFuncs = getDrawFuncs(tile, group);
+      drawFuncs.push(() => { if (verbose) callback("progress", group.name); });
+      return drawFuncs;
     }
 
     function putTogether() {
@@ -69,24 +72,20 @@ export function initRenderer(canvSize, styleGroups) {
     }
   }
 
-  function drawGroup(tile, layerGroup, callback = () => undefined) {
+  function getDrawFuncs(tile, layerGroup) {
     let lamina = getLamina(tile, layerGroup.name);
-    if (lamina.rendered) return callback(null, tile);
+    if (lamina.rendered) return [() => true];
 
     lamina.ctx.clearRect(0, 0, canvSize, canvSize);
     const boundingBoxes = [];
 
-    // Draw the layers: asynchronously, but in order
-    // Create a chain of functions, one for each layer.
+    // Create an array of painter calls, one for each layer.
     const drawCalls = layerGroup.layers.map(layer => {
       return () => layer.painter(lamina.ctx, tile.z, tile.sources, boundingBoxes);
     });
-    // Execute the chain, with copyResult as the final callback
-    chains.chainSyncList(drawCalls, returnResult, tile.id);
 
-    function returnResult() {
-      lamina.rendered = true;
-      return callback(null, tile);
-    }
+    // Add a function to update the rendered flag
+    drawCalls.push(() => { lamina.rendered = true; });
+    return drawCalls;
   }
 }

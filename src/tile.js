@@ -13,6 +13,7 @@ export function initTileFactory(size, sources, styleGroups, loader) {
 
   function orderTile(z, x, y, callback = () => true) {
     const loadTasks = {};
+    const cancelers = [];
     var numToDo = tileSourceKeys.length;
     var baseLamina = initLamina(size);
 
@@ -27,6 +28,7 @@ export function initTileFactory(size, sources, styleGroups, loader) {
       ctx: baseLamina.ctx,
 
       loaded: false,
+      storeCanceler: (canceler) => cancelers.push(canceler),
       cancel,
       canceled: false,
       rendering: baseLamina.rendering,
@@ -56,6 +58,7 @@ export function initTileFactory(size, sources, styleGroups, loader) {
     }
 
     function cancel() {
+      while (cancelers.length > 0) cancelers.shift()();
       Object.values(loadTasks).forEach(task => loader.cancelTask(task));
       tile.canceled = true;
     }
