@@ -1,4 +1,4 @@
-import { initChunkQueue } from "./queue/chunks.js";
+import { initChunkQueue } from "./queue.js";
 
 export function initRenderer(canvSize, styleGroups) {
   // Input canvSize is an integer, for the pixel size of the (square) tiles

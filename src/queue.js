@@ -1,4 +1,4 @@
-import "./timeout.js";
+import 'zero-timeout';
 
 export function initChunkQueue() {
   const tasks = [];

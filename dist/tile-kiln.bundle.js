@@ -406,6 +406,62 @@ try { exports.parseCSSColor = parseCSSColor; } catch(e) { }
 });
 var csscolorparser_1 = csscolorparser.parseCSSColor;
 
+function buildInterpFunc(base, sampleVal) {
+  // Return a function to interpolate the value of y(x), given endpoints
+  // p0 = (x0, y0) and p2 = (x1, y1)
+
+  const scale = getScale(base);
+  const interpolate = getInterpolator(sampleVal);
+
+  return (p0, x, p1) => interpolate( p0[1], scale(p0[0], x, p1[0]), p1[1] );
+}
+
+function getScale(base) {
+  // Return a function to find the relative position of x between a and b
+
+  // Exponential scale follows mapbox-gl-js, style-spec/function/index.js
+  // NOTE: https://github.com/mapbox/mapbox-gl-js/issues/2698 not addressed!
+  const scale = (base === 1)
+    ? (a, x, b) => (x - a) / (b - a)  // Linear scale
+    : (a, x, b) => (Math.pow(base, x - a) - 1) / (Math.pow(base, b - a) - 1);
+
+  // Add check for zero range
+  return (a, x, b) => (a === b)
+    ? 0
+    : scale(a, x, b);
+}
+
+function getInterpolator(sampleVal) {
+  // Return a function to find an interpolated value between end values v1, v2,
+  // given relative position t between the two end positions
+
+  var type = typeof sampleVal;
+  if (type === "string" && csscolorparser_1(sampleVal)) type = "color";
+
+  switch (type) {
+    case "number": // Linear interpolator
+      return (v1, t, v2) => v1 + t * (v2 - v1);
+
+    case "color":  // Interpolate RGBA
+      return (v1, t, v2) => 
+        interpColor( csscolorparser_1(v1), t, csscolorparser_1(v2) );
+
+    default:       // Assume step function
+      return (v1, t, v2) => v1;
+  }
+}
+
+function interpColor(c0, t, c1) {
+  // Inputs c0, c1 are 4-element RGBA arrays as returned by parseCSSColor
+  let c = c0.map( (c0_i, i) => c0_i + t * (c1[i] - c0_i) );
+
+  return "rgba(" +
+    Math.round(c[0]) + ", " +
+    Math.round(c[1]) + ", " + 
+    Math.round(c[2]) + ", " +
+    c[3] + ")";
+}
+
 function collectGetters(properties = {}, keyDefaultPairs) {
   const getters = {};
   keyDefaultPairs.forEach( ([key, defaultVal]) => {
@@ -457,7 +513,7 @@ function getStyleFunc(style, getArg) {
 
 function buildStopFunc(stops, base = 1) {
   const izm = stops.length - 1;
-  const interpolate = getInterpolator(stops[0][1]);
+  const interpolateVal = buildInterpFunc(base, stops[0][1]);
 
   return function(x) {
     let iz = stops.findIndex(stop => stop[0] > x);
@@ -465,47 +521,8 @@ function buildStopFunc(stops, base = 1) {
     if (iz === 0) return stops[0][1]; // x is below first stop
     if (iz < 0) return stops[izm][1]; // x is above last stop
 
-    let t = interpFactor(base, stops[iz-1][0], x, stops[iz][0]);
-
-    return interpolate(stops[iz-1][1], stops[iz][1], t);
+    return interpolateVal(stops[iz-1], x, stops[iz]);
   }
-}
-
-function getInterpolator(sampleVal) {
-  var type = typeof sampleVal;
-
-  // Linear interpolator for numbers
-  if (type === "number") return (v1, v2, t) => v1 + t * (v2 - v1);
-
-  var isColor = (type === "string" && csscolorparser_1(sampleVal));
-  return (isColor)
-    ? (v1, v2, t) => interpColor(csscolorparser_1(v1), csscolorparser_1(v2), t)
-    : (v1, v2, t) => v1; // Assume step function for other types
-}
-
-function interpFactor(base, x0, x, x1) {
-  // Follows mapbox-gl-js, style-spec/function/index.js.
-  // NOTE: https://github.com/mapbox/mapbox-gl-js/issues/2698 not addressed!
-  const range = x1 - x0;
-  if (range === 0) return 0;
-
-  const dx = x - x0;
-  if (base === 1) return dx / range;
-
-  return (Math.pow(base, dx) - 1) / (Math.pow(base, range) - 1);
-}
-
-function interpColor(c0, c1, t) {
-  // Inputs c0, c1 are 4-element RGBA arrays as returned by parseCSSColor
-  let c = [];
-  for (let i = 0; i < 4; i++) {
-    c[i] = c0[i] + t * (c1[i] - c0[i]);
-  }
-  return "rgba(" +
-    Math.round(c[0]) + ", " +
-    Math.round(c[1]) + ", " + 
-    Math.round(c[2]) + ", " +
-    c[3] + ")";
 }
 
 // Renders layers that cover the whole tile (like painting with a roller)
@@ -601,12 +618,18 @@ function getSetters(style) {
       setters.push(
         getSetter(paint["fill-color"], "fillStyle"),
         getSetter(paint["fill-opacity"], "globalAlpha"),
-        // fill-outline-color, 
         // fill-translate, 
         // fill-translate-anchor,
         // fill-pattern,
       );
       methods.push("fill");
+      if (paint["fill-outline-color"]) {
+        setters.push(
+          getSetter(paint["fill-outline-color"], "strokeStyle"),
+          getSetter(paint["fill-outline-width"], "lineWidth"), // nonstandard
+        );
+        methods.push("stroke");
+      }
       break;
 
     default:
@@ -1843,14 +1866,7 @@ function tileURL(endpoint, z, x, y) {
 initZeroTimeouts();
 
 function initZeroTimeouts() {
-  // Like setTimeout, but without the (browser-dependent) minimum delay.
-  // Why? The supplied callback will be bumped to the back of the task queue,
-  // allowing more critical tasks (like user interaction, screen rendering)
-  // to finish first. But if the task queue is empty, the callback will be 
-  // executed immediately.
-  // Useful for splitting up long-running tasks across frames. See 
-  // https://dbaron.org/log/20100309-faster-timeouts
-
+  // setTimeout with true zero delay. https://github.com/GlobeletJS/zero-timeout
   const timeouts = [];
   var taskId = 0;
 
@@ -1880,7 +1896,7 @@ function initZeroTimeouts() {
     return taskId;
   };
 
-  window.cancelZeroTimeout = function(id) {
+  window.clearZeroTimeout = function(id) {
     let task = timeouts.find(timeout => timeout.id === id);
     if (task) task.canceled = true;
   };

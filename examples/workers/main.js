@@ -22,7 +22,7 @@ export function main() {
   // Initialize tile factory
   const tileMaker = tilekiln.init({
     size: 512,
-    style: "./macrostrat-grouped.json",
+    style: "./macrostrat-onepass.json", //"./macrostrat-grouped.json",
     token: "pk.eyJ1IjoiamhlbWJkIiwiYSI6ImNqcHpueHpyZjBlMjAzeG9kNG9oNzI2NTYifQ.K7fqhk2Z2YZ8NIV94M-5nA",
     callback: setup,
   });

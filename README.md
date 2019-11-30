@@ -19,7 +19,7 @@ Check out the simple [single-tile example] with dynamic style changes.
 Like the simple code, but need one more feature? We welcome pull requests!
 
 [Mapbox style specification]: https://docs.mapbox.com/mapbox-gl-js/style-spec/
-[Canvas2D]: https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D
+[Canvas 2D]: https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D
 [Mapbox GL JS]: https://github.com/mapbox/mapbox-gl-js
 [single-tile example]: https://globeletjs.github.io/tile-kiln/examples/dynamic/index.html
 
