@@ -1,5 +1,5 @@
 import { initWorker } from "./load-mvt/boss.js";
-import { loadStyle } from "./style/style.js";
+import { loadStyle } from "./style.js";
 import { initGroups } from "./groups.js";
 import { initTileFactory } from "./tile.js";
 import { initRenderer } from "./renderer.js";

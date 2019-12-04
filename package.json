@@ -45,7 +45,8 @@
   },
   "dependencies": {
     "pbf": "^3.2.1",
-    "tile-painter": "0.0.2",
+    "tile-painter": "0.0.3",
+    "tile-stencil": "0.0.1",
     "vector-tile-js": "github:jjhembd/vector-tile-js",
     "zero-timeout": "0.0.2"
   }

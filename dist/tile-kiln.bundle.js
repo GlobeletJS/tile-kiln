@@ -197,6 +197,84 @@ function getImage(href) {
   });
 }
 
+function buildFeatureFilter(filterObj) {
+  // filterObj is a filter definition following the "deprecated" syntax:
+  // https://docs.mapbox.com/mapbox-gl-js/style-spec/#other-filter
+  if (!filterObj) return () => true;
+
+  var type, key, vals;
+
+  // If this is a combined filter, the vals are themselves filter definitions
+  [type, ...vals] = filterObj;
+  switch (type) {
+    case "all": {
+      let filters = vals.map(buildFeatureFilter);  // Iteratively recursive!
+      return (d) => filters.every( filt => filt(d) );
+    }
+    case "any": {
+      let filters = vals.map(buildFeatureFilter);
+      return (d) => filters.some( filt => filt(d) );
+    }
+    case "none": {
+      let filters = vals.map(buildFeatureFilter);
+      return (d) => filters.every( filt => !filt(d) );
+    }
+  }
+
+  [type, key, ...vals] = filterObj;
+  var getVal = initFeatureValGetter(key);
+
+  switch (type) {
+    // Existential Filters
+    case "has": 
+      return d => !!getVal(d); // !! forces a Boolean return
+    case "!has": 
+      return d => !getVal(d);
+
+    // Comparison Filters
+    case "==": 
+      return d => getVal(d) === vals[0];
+    case "!=":
+      return d => getVal(d) !== vals[0];
+    case ">":
+      return d => getVal(d) > vals[0];
+    case ">=":
+      return d => getVal(d) >= vals[0];
+    case "<":
+      return d => getVal(d) < vals[0];
+    case "<=":
+      return d => getVal(d) <= vals[0];
+
+    // Set Membership Filters
+    case "in" :
+      return d => vals.includes( getVal(d) );
+    case "!in" :
+      return d => !vals.includes( getVal(d) );
+    default:
+      console.log("prepFilter: unknown filter type = " + filterObj[0]);
+  }
+  // No recognizable filter criteria. Return a filter that is always true
+  return () => true;
+}
+
+function initFeatureValGetter(key) {
+  switch (key) {
+    case "$type":
+      // NOTE: data includes MultiLineString, MultiPolygon, etc-NOT IN SPEC
+      return f => {
+        let t = f.geometry.type;
+        if (t === "MultiPoint") return "Point";
+        if (t === "MultiLineString") return "LineString";
+        if (t === "MultiPolygon") return "Polygon";
+        return t;
+      };
+    case "$id":
+      return f => f.id;
+    default:
+      return f => f.properties[key];
+  }
+}
+
 function createCommonjsModule(fn, module) {
 	return module = { exports: {} }, fn(module, module.exports), module.exports;
 }
@@ -462,10 +540,10 @@ function interpColor(c0, t, c1) {
     c[3] + ")";
 }
 
-function collectGetters(properties = {}, keyDefaultPairs) {
+function autoGetters(properties = {}, defaults) {
   const getters = {};
-  keyDefaultPairs.forEach( ([key, defaultVal]) => {
-    getters[key] = buildStyleFunc(properties[key], defaultVal);
+  Object.keys(defaults).forEach(key => {
+    getters[key] = buildStyleFunc(properties[key], defaults[key]);
   });
   return getters;
 }
@@ -525,14 +603,218 @@ function buildStopFunc(stops, base = 1) {
   }
 }
 
+const layoutDefaults = {
+  "background": {
+    "visibility": "visible",
+  },
+  "fill": {
+    "visibility": "visible",
+  },
+  "line": {
+    "visibility": "visible",
+    "line-cap": "butt",
+    "line-join": "miter",
+    "line-miter-limit": 2,
+    "line-round-limit": 1.05,
+  },
+  "symbol": {
+    "visibility": "visible",
+
+    "symbol-placement": "point",
+    "symbol-spacing": 250,
+    "symbol-avoid-edges": false,
+    "symbol-sort-key": undefined,
+    "symbol-z-order": "auto",
+
+    "icon-allow-overlap": false,
+    "icon-ignore-placement": false,
+    "icon-optional": false,
+    "icon-rotation-alignment": "auto",
+    "icon-size": 1,
+    "icon-text-fit": "none",
+    "icon-text-fit-padding": [0, 0, 0, 0],
+    "icon-image": undefined,
+    "icon-rotate": 0,
+    "icon-padding": 2,
+    "icon-keep-upright": false,
+    "icon-offset": [0, 0],
+    "icon-anchor": "center",
+    "icon-pitch-alignment": "auto",
+
+    "text-pitch-alignment": "auto",
+    "text-rotation-alignment": "auto",
+    "text-field": "",
+    "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"],
+    "text-size": 16,
+    "text-max-width": 10,
+    "text-line-height": 1.2,
+    "text-letter-spacing": 0,
+    "text-justify": "center",
+    "text-radial-offset": 0,
+    "text-variable-anchor": undefined,
+    "text-anchor": "center",
+    "text-max-angle": 45,
+    "text-rotate": 0,
+    "text-padding": 2.0,
+    "text-keep-upright": true,
+    "text-transform": "none",
+    "text-offset": [0, 0],
+    "text-allow-overlap": false,
+    "text-ignore-placement": false,
+    "text-optional": false,
+  },
+  "raster": {
+    "visibility": "visible",
+  },
+  "circle": {
+    "visibility": "visible",
+  },
+  // "fill-extrusion": {},
+  // "heatmap": {},
+  // "hillshade": {},
+};
+
+const paintDefaults = {
+  "background": {
+    "background-color": "#000000",
+    "background-opacity": 1,
+    "background-pattern": undefined,
+  },
+  "fill": {
+    "fill-antialias": true,
+    "fill-opacity": 1,
+    "fill-color": "#000000",
+    "fill-outline-color": undefined,
+    "fill-outline-width": 1, // non-standard!
+    "fill-translate": [0, 0],
+    "fill-translate-anchor": "map",
+    "fill-pattern": undefined,
+  },
+  "line": {
+    "line-opacity": 1,
+    "line-color": "#000000",
+    "line-translate": [0, 0],
+    "line-translate-anchor": "map",
+    "line-width": 1,
+    "line-gap-width": 0,
+    "line-offset": 0,
+    "line-blur": 0,
+    "line-dasharray": undefined,
+    "line-pattern": undefined,
+    "line-gradient": undefined,
+  },
+  "symbol": {
+    "icon-opacity": 1,
+    "icon-color": "#000000",
+    "icon-halo-color": "rgba(0, 0, 0, 0)",
+    "icon-halo-width": 0,
+    "icon-halo-blur": 0,
+    "icon-translate": [0, 0],
+    "icon-translate-anchor": "map",
+
+    "text-opacity": 1,
+    "text-color": "#000000",
+    "text-halo-color": "rgba(0, 0, 0, 0)",
+    "text-halo-width": 0,
+    "text-halo-blur": 0,
+    "text-translate": [0, 0],
+    "text-translate-anchor": "map",
+  },
+  "raster": {
+    "raster-opacity": 1,
+    "raster-hue-rotate": 0,
+    "raster-brighness-min": 0,
+    "raster-brightness-max": 1,
+    "raster-saturation": 0,
+    "raster-contrast": 0,
+    "raster-resampling": "linear",
+    "raster-fade-duration": 300,
+  },
+  "circle": {
+    "circle-radius": 5,
+    "circle-color": "#000000",
+    "circle-blur": 0,
+    "circle-opacity": 1,
+    "circle-translate": [0, 0],
+    "circle-translate-anchor": "map",
+    "circle-pitch-scale": "map",
+    "circle-pitch-alignment": "viewport",
+    "circle-stroke-width": 0,
+    "circle-stroke-color": "#000000",
+    "circle-stroke-opacity": 1,
+  },
+  // "fill-extrusion": {},
+  // "heatmap": {},
+  // "hillshade": {},
+};
+
+function parseLayer(layer) {
+  // NOTE: modifies input layer!
+  layer.filter = buildFeatureFilter(layer.filter);
+  layer.layout = autoGetters(layer.layout, layoutDefaults[layer.type]);
+  layer.paint  = autoGetters(layer.paint,  paintDefaults[layer.type] );
+  return layer;
+}
+
+function parseStyle(style, mapboxToken) {
+  // Get a Promise that resolves to a Mapbox style document
+  const getStyleJson = (typeof style === "object")
+    ? Promise.resolve(style)                // style is JSON already
+    : getJSON( expandStyleURL(style, mapboxToken) ); // Get from URL
+
+  // Now set up a Promise chain to process the document
+  return getStyleJson
+    .then( expandLayerReferences )
+
+    .then( retrieveSourceInfo )
+
+    .then( parseLayers );
+
+  // Gets data from referenced URLs, and attaches it to the style
+  function retrieveSourceInfo(styleDoc) {
+    const getSprite = loadSprite(styleDoc, mapboxToken);
+
+    const expandSources = Object.keys(styleDoc.sources)
+      .map(key => expandSource(key, styleDoc.sources, mapboxToken));
+
+    return Promise.all([...expandSources, getSprite])
+      .then(() => styleDoc);
+  }
+}
+
+function parseLayers(styleDoc) {
+  styleDoc.layers.forEach(parseLayer);
+  return styleDoc;
+}
+
+function loadSprite(styleDoc, token) {
+  if (!styleDoc.sprite) return;
+
+  const urls = expandSpriteURLs(styleDoc.sprite, token);
+
+  return Promise.all([getImage(urls.image), getJSON(urls.meta)])
+    .then(([image, meta]) => { styleDoc.spriteData = { image, meta }; });
+}
+
+function expandSource(key, sources, token) {
+  var source = sources[key];
+  if (source.url === undefined) return; // No change
+
+  // Load the referenced TileJSON document
+  return getJSON( expandTileURL(source.url, token) )
+    .then(json => merge(json));
+
+  function merge(json) {
+    // Add any custom properties from the style document
+    Object.keys(source).forEach( k2 => { json[k2] = source[k2]; } );
+    // Replace current entry with the TileJSON data
+    sources[key] = json;
+  }
+}
+
 // Renders layers that cover the whole tile (like painting with a roller)
 
-function initBackgroundFill(style, canvSize) {
-  const paint = collectGetters(style.paint, [
-    ["background-color"],
-    ["background-opacity"],
-  ]);
-
+function initBackgroundFill(layout, paint, canvSize) {
   return function(ctx, zoom) {
     ctx.fillStyle = paint["background-color"](zoom);
     ctx.globalAlpha = paint["background-opacity"](zoom);
@@ -540,16 +822,7 @@ function initBackgroundFill(style, canvSize) {
   }
 }
 
-function initRasterFill(style, canvSize) {
-  const paint = collectGetters(style.paint, [
-    ["raster-opacity"],
-    // ["raster-hue-rotate"],
-    // ["raster-brightness-min"],
-    // ["raster-brightness-max"],
-    // ["raster-saturation"],
-    // ["raster-contrast"],
-  ]);
-
+function initRasterFill(layout, paint, canvSize) {
   return function(ctx, zoom, image) {
     ctx.globalAlpha = paint["raster-opacity"](zoom);
     // TODO: we are forcing one tile to cover the canvas!
@@ -557,93 +830,6 @@ function initRasterFill(style, canvSize) {
     // be half the size of the vector canvas, so we need 4 of them...
     ctx.drawImage(image, 0, 0, canvSize, canvSize);
   }
-}
-
-function getSetter(styleProperty, setter) {
-  // For each relevant style property, return functions to:
-  // 1. Get the style value. This function could depend on the data
-  //    (feature.properties), or only on the zoom level.
-  const getStyle = buildStyleFunc(styleProperty);
-
-  // 2. Set the Canvas/d3-path state based on the style value. In general,
-  //    the setter signature is setState(val, context, path)
-  const setState = (typeof setter === "string")
-    ? (val, ctx) => { ctx[setter] = val; } // Default setter sets Canvas state
-    : setter;
-
-  // These 2 functions will be composed, i.e., setState(getStyle(...), ...)
-  // But we return them separately for now, since we may want to use the style
-  // values first, e.g. for sorting the data
-  return { getStyle, setState };
-}
-
-function getSetters(style) {
-  const layout = style.layout;
-  const paint = style.paint;
-  const setters = [], methods = [];
-
-  switch (style.type) {
-    case "circle":
-      let setRadius = (radius, ctx, path) => { 
-        if (radius) path.pointRadius(radius); 
-      };
-      setters.push(
-        getSetter(paint["circle-radius"], setRadius),
-        getSetter(paint["circle-color"], "fillStyle"),
-        getSetter(paint["circle-opacity"], "globalAlpha"),
-      );
-      methods.push("fill");
-      break;
-
-    case "line":
-      if (layout) setters.push(
-        getSetter(layout["line-cap"], "lineCap"),
-        getSetter(layout["line-join"], "lineJoin"),
-        getSetter(layout["line-miter-limit"], "miterLimit"),
-        // line-round-limit,
-      );
-      setters.push(
-        getSetter(paint["line-width"], "lineWidth"),
-        getSetter(paint["line-opacity"], "globalAlpha"),
-        getSetter(paint["line-color"], "strokeStyle"),
-        // line-gap-width, 
-        // line-translate, line-translate-anchor,
-        // line-offset, line-blur, line-gradient, line-pattern, 
-        // line-dasharray
-      );
-      methods.push("stroke");
-      break;
-
-    case "fill":
-      setters.push(
-        getSetter(paint["fill-color"], "fillStyle"),
-        getSetter(paint["fill-opacity"], "globalAlpha"),
-        // fill-translate, 
-        // fill-translate-anchor,
-        // fill-pattern,
-      );
-      methods.push("fill");
-      if (paint["fill-outline-color"]) {
-        setters.push(
-          getSetter(paint["fill-outline-color"], "strokeStyle"),
-          getSetter(paint["fill-outline-width"], "lineWidth"), // nonstandard
-        );
-        methods.push("stroke");
-      }
-      break;
-
-    default:
-      // Missing fill-extrusion, heatmap, hillshade
-      return console.log("ERROR in initBrush: layer.type = " +
-        style.type + " not supported!");
-  }
-
-  // Sort the getter/setter pairs based on whether they are data dependent
-  const dataFuncs = setters.filter(s => s.getStyle.type === "property");
-  // zoomFuncs could include constant styles
-  const zoomFuncs = setters.filter(s => s.getStyle.type !== "property");
-
-  return { dataFuncs, zoomFuncs, methods };
 }
 
 // Adds floating point numbers with twice the normal precision.
@@ -1132,33 +1318,54 @@ function index(projection, context) {
   return path.projection(projection).context(context);
 }
 
-function initBrush(style) {
-  const { dataFuncs, zoomFuncs, methods } = getSetters(style);
+function initBrush({ setters, methods }) {
+  const dataFuncs = setters.filter(s => s.getStyle.type === "property");
+  const zoomFuncs = setters.filter(s => s.getStyle.type !== "property");
 
-  const setZoomFuncs = (zoom, ctx, path) => zoomFuncs.forEach(f => {
-    return f.setState(f.getStyle(zoom), ctx, path);
-  });
-
-  const prepData = (dataFuncs.length > 0)
-    ? (zoom, data) => addStylesToFeatures(dataFuncs, zoom, data)
-    : (zoom, data) => data;
-
-  // Choose render function
+  // Choose draw function based on whether styles are data-dependent
   const draw = (dataFuncs.length > 0)
-    ? (ctx, path, data) => drawVarying(data, ctx, path, methods, dataFuncs)
-    : (ctx, path, data) => drawConstant(data, ctx, path, methods);
+    ? dataDependentDraw
+    : constantDraw;
 
   return function(ctx, zoom, data) {
     const path = index(null, ctx);
 
     // Set the non-data-dependent state
-    setZoomFuncs(zoom, ctx, path);
-
-    // Prepare the data, computing data-dependent styles if needed
-    const preppedData = prepData(zoom, data);
+    zoomFuncs.forEach(f => f.setState(f.getStyle(zoom), ctx, path));
 
     // Draw everything and return
-    return draw(ctx, path, preppedData);
+    return draw(ctx, path, zoom, data);
+  }
+
+  function dataDependentDraw(ctx, path, zoom, data) {
+    const features = addStylesToFeatures(dataFuncs, zoom, data);
+
+    // Draw features, updating canvas state as data-dependent styles change
+    let numFeatures = features.length;
+    let i = 0;
+    while (i < numFeatures) {
+      // Set state based on the styles of the current feature
+      let styles = features[i].styles;
+      dataFuncs.forEach( (f, j) => f.setState(styles[j], ctx, path) );
+
+      ctx.beginPath();
+      // Add features to the path, until the styles change
+      let id = features[i].styleID;
+      while (i < numFeatures && features[i].styleID === id) {
+        path(features[i]);
+        i++;
+      }
+
+      // Render the current path
+      methods.forEach(method => ctx[method]());
+    }
+  }
+
+  function constantDraw(ctx, path, zoom, data) {
+    // Draw all the data with the current canvas state
+    ctx.beginPath();
+    path(data);
+    methods.forEach(method => ctx[method]());
   }
 }
 
@@ -1172,40 +1379,75 @@ function addStylesToFeatures(propFuncs, zoom, data) {
   });
 
   // Sort the array, to collect features with the same styling
-  styledFeatures.sort( (a, b) => (a.styleID < b.styleID) ? -1 : 1 );
-
-  // Return a valid GeoJSON Feature Collection
-  return { type: "FeatureCollection", features: styledFeatures };
+  return styledFeatures.sort( (a, b) => (a.styleID < b.styleID) ? -1 : 1 );
 }
 
-function drawConstant(data, ctx, path, methods) {
-  // Draw all the data with the current canvas state
-  ctx.beginPath();
-  path(data);
-  methods.forEach(method => ctx[method]());
+// Renders discrete lines, points, polygons... like painting with a brush
+
+function canv(property) {
+  // Create a default state setter for a Canvas 2D renderer
+  return (val, ctx) => { ctx[property] = val; };
 }
 
-function drawVarying(data, ctx, path, methods, propFuncs) {
-  // Draw features, updating canvas state as data-dependent styles change
+function pair(getStyle, setState) {
+  // Return a style value getter and a renderer state setter as a paired object
+  return { getStyle, setState };
+}
 
-  let numFeatures = data.features.length;
-  let i = 0;
-  while (i < numFeatures) {
-    // Set state based on the styles of the current feature
-    let styles = data.features[i].styles;
-    propFuncs.forEach( (f, j) => f.setState(styles[j], ctx, path) );
+function initCircle(layout, paint) {
+  const setRadius = (radius, ctx, path) => {
+    if (radius) path.pointRadius(radius);
+  };
+  const setters = [
+    pair(paint["circle-radius"],  setRadius),
+    pair(paint["circle-color"],   canv("fillStyle")),
+    pair(paint["circle-opacity"], canv("globalAlpha")),
+  ];
+  const methods = ["fill"];
 
-    ctx.beginPath();
-    // Add features to the path, until the styles change
-    let id = data.features[i].styleID;
-    while (i < numFeatures && data.features[i].styleID === id) {
-      path(data.features[i]);
-      i++;
-    }
+  return initBrush({ setters, methods });
+}
 
-    // Render the current path
-    methods.forEach(method => ctx[method]());
+function initLine(layout, paint) {
+  const setters = [
+    pair(layout["line-cap"],      canv("lineCap")),
+    pair(layout["line-join"],     canv("lineJoin")),
+    pair(layout["line-miter-limit"], canv("miterLimit")),
+    // line-round-limit,
+
+    pair(paint["line-width"],     canv("lineWidth")),
+    pair(paint["line-opacity"],   canv("globalAlpha")),
+    pair(paint["line-color"],     canv("strokeStyle")),
+    // line-gap-width, 
+    // line-translate, line-translate-anchor,
+    // line-offset, line-blur, line-gradient, line-pattern, 
+    // line-dasharray
+  ];
+  const methods = ["stroke"];
+
+  return initBrush({ setters, methods });
+}
+
+function initFill(layout, paint) {
+  const setters = [
+    pair(paint["fill-color"],     canv("fillStyle")),
+    pair(paint["fill-opacity"],   canv("globalAlpha")),
+    // fill-translate, 
+    // fill-translate-anchor,
+    // fill-pattern,
+  ];
+  const methods = ["fill"];
+
+  let outline = paint["fill-outline-color"];
+  if (outline.type !== "constant" || outline() !== undefined) {
+    setters.push(
+      pair(paint["fill-outline-color"], canv("strokeStyle")),
+      pair(paint["fill-outline-width"], canv("lineWidth")), // nonstandard
+    );
+    methods.push("stroke");
   }
+
+  return initBrush({ setters, methods });
 }
 
 function getTokenParser(tokenText) {
@@ -1312,28 +1554,6 @@ function getTextTransform(code) {
   }
 }
 
-function textSetup(style) {
-  // Parse the style properties into zoom-dependent functions
-  const getLayout = collectGetters(style.layout, [
-    ["text-field"],
-    ["text-size", 16],
-    ["text-font"],
-    ["text-line-height", 1.2],
-    ["text-padding", 2.0],
-    ["text-offset", [0, 0]],
-    ["text-anchor"],
-    ["text-transform", "none"],
-  ]);
-
-  const getPaint = collectGetters(style.paint, [
-    ["text-color"],
-    ["text-halo-color"],
-    ["text-halo-width", 0],
-  ]);
-
-  return (ctx, zoom) => initTextLabeler(ctx, zoom, getLayout, getPaint);
-}
-
 function initTextLabeler(ctx, zoom, layout, paint) {
   const textParser = getTokenParser( layout["text-field"](zoom) );
 
@@ -1391,16 +1611,7 @@ function initTextLabeler(ctx, zoom, layout, paint) {
   }
 }
 
-function iconSetup(style, sprite) {
-  const getLayout = collectGetters(style.layout, [
-    ["icon-image"],
-    ["icon-padding", 2],
-  ]);
-
-  return (ctx, zoom) => initIconLabeler(ctx, zoom, getLayout, sprite);
-}
-
-function initIconLabeler(ctx, zoom, layout, sprite) {
+function initIconLabeler(ctx, zoom, layout, paint, sprite) {
   const getSpriteID = getTokenParser( layout["icon-image"](zoom) );
   const iconPadding = layout["icon-padding"](zoom);
 
@@ -1441,16 +1652,13 @@ function initIconLabeler(ctx, zoom, layout, sprite) {
   }
 }
 
-function initLabeler(style, sprite) {
+function initLabeler(layout, paint, sprite) {
   // Skip unsupported symbol types
-  if (style.layout["symbol-placement"] === "line") return () => undefined;
-
-  const initTextLabeler = textSetup(style);
-  const initIconLabeler = iconSetup(style, sprite);
+  if (layout["symbol-placement"]() === "line") return () => undefined;
 
   return function(ctx, zoom, data, boxes) {
-    const textLabeler = initTextLabeler(ctx, zoom);
-    const iconLabeler = initIconLabeler(ctx, zoom);
+    const textLabeler = initTextLabeler(ctx, zoom, layout, paint);
+    const iconLabeler = initIconLabeler(ctx, zoom, layout, paint, sprite);
 
     data.features.forEach(drawLabel);
 
@@ -1486,81 +1694,28 @@ function intersects(box1, box2) {
   return true;
 }
 
-function buildFeatureFilter(filterObj) {
-  // filterObj is a filter definition following the "deprecated" syntax:
-  // https://docs.mapbox.com/mapbox-gl-js/style-spec/#other-filter
-  if (!filterObj) return () => true;
+function initRenderer(style, sprite, canvasSize) {
+  const layout = style.layout;
+  const paint = style.paint;
 
-  var type, key, vals;
-
-  // If this is a combined filter, the vals are themselves filter definitions
-  [type, ...vals] = filterObj;
-  switch (type) {
-    case "all": {
-      let filters = vals.map(buildFeatureFilter);  // Iteratively recursive!
-      return (d) => filters.every( filt => filt(d) );
-    }
-    case "any": {
-      let filters = vals.map(buildFeatureFilter);
-      return (d) => filters.some( filt => filt(d) );
-    }
-    case "none": {
-      let filters = vals.map(buildFeatureFilter);
-      return (d) => filters.every( filt => !filt(d) );
-    }
-  }
-
-  [type, key, ...vals] = filterObj;
-  var getVal = initFeatureValGetter(key);
-
-  switch (type) {
-    // Existential Filters
-    case "has": 
-      return d => !!getVal(d); // !! forces a Boolean return
-    case "!has": 
-      return d => !getVal(d);
-
-    // Comparison Filters
-    case "==": 
-      return d => getVal(d) === vals[0];
-    case "!=":
-      return d => getVal(d) !== vals[0];
-    case ">":
-      return d => getVal(d) > vals[0];
-    case ">=":
-      return d => getVal(d) >= vals[0];
-    case "<":
-      return d => getVal(d) < vals[0];
-    case "<=":
-      return d => getVal(d) <= vals[0];
-
-    // Set Membership Filters
-    case "in" :
-      return d => vals.includes( getVal(d) );
-    case "!in" :
-      return d => !vals.includes( getVal(d) );
+  switch (style.type) {
+    case "background":
+      return initBackgroundFill(layout, paint, canvasSize);
+    case "raster":
+      return initRasterFill(layout, paint, canvasSize);
+    case "symbol":
+      return initLabeler(layout, paint, sprite);
+    case "circle":
+      return initCircle(layout, paint);
+    case "line":
+      return initLine(layout, paint);
+    case "fill":
+      //return initBrush(style, layout, paint);
+      return initFill(layout, paint);
     default:
-      console.log("prepFilter: unknown filter type = " + filterObj[0]);
-  }
-  // No recognizable filter criteria. Return a filter that is always true
-  return () => true;
-}
-
-function initFeatureValGetter(key) {
-  switch (key) {
-    case "$type":
-      // NOTE: data includes MultiLineString, MultiPolygon, etc-NOT IN SPEC
-      return f => {
-        let t = f.geometry.type;
-        if (t === "MultiPoint") return "Point";
-        if (t === "MultiLineString") return "LineString";
-        if (t === "MultiPolygon") return "Polygon";
-        return t;
-      };
-    case "$id":
-      return f => f.id;
-    default:
-      return f => f.properties[key];
+      // Missing fill-extrusion, heatmap, hillshade
+      return console.log("ERROR in initRenderer: layer.type = " +
+        style.type + " not supported!");
   }
 }
 
@@ -1570,36 +1725,12 @@ function initPainter(params) {
   const canvasSize = params.canvasSize || 512;
 
   // Define data prep and rendering functions
-  var getData, render;
-  switch (style.type) {
-    case "background":
-      getData = () => true;
-      render = initBackgroundFill(style, canvasSize);
-      break;
-    case "raster":
-      getData = makeSourceGetter(style);
-      render = initRasterFill(style, canvasSize);
-      break;
-    case "symbol":
-      getData = makeFeatureGetter(style);
-      render = initLabeler(style, sprite);
-      break;
-    case "circle":
-    case "line":
-    case "fill":
-      getData = makeFeatureGetter(style);
-      render = initBrush(style);
-      break;
-    default:
-      // Missing fill-extrusion, heatmap, hillshade
-      return console.log("ERROR in initRenderer: layer.type = " +
-        style.type + " not supported!");
-  }
+  const getData = makeDataGetter(style);
+  const render = initRenderer(style, sprite, canvasSize);
 
   // Compose into one function
   return function(context, zoom, sources, boundingBoxes) {
     // Quick exits if this layer is not meant to be displayed
-    // TODO: this is keeping alive the link back to the style document?
     if (style.layout && style.layout["visibility"] === "none") return false;
     if (style.minzoom !== undefined && zoom < style.minzoom) return false;
     if (style.maxzoom !== undefined && zoom > style.maxzoom) return false;
@@ -1608,29 +1739,26 @@ function initPainter(params) {
     const data = getData(sources);
     if (!data) return false;
 
-    // Render
-    render(context, zoom, data, boundingBoxes);
-
-    // Restore Canvas state to starting point
-    context.restore();
-    // Save the starting point again (restore removed the saved copy)
+    // Save the initial context state, and restore it after rendering
     context.save();
+    render(context, zoom, data, boundingBoxes);
+    context.restore();
 
-    // Return flag to indicate the canvas has changed
-    return true;
+    return true; // true to indicate canvas has changed
   }
 }
 
-function makeSourceGetter(style) {
+function makeDataGetter(style) {
+  // Background layers don't need data
+  if (style.type === "background") return () => true;
+
   // Store the source name, so we don't re-access the style object every time
   const sourceName = style["source"];
-  return (sources) => sources[sourceName];
-}
+  // Raster layers don't specify a source-layer
+  if (style.type === "raster") return (sources) => sources[sourceName];
 
-function makeFeatureGetter(style) {
-  const sourceName = style["source"];
   const layerName = style["source-layer"];
-  const filter = buildFeatureFilter(style.filter);
+  const filter = style.filter;
 
   return function(sources) {
     let source = sources[sourceName];
@@ -1643,36 +1771,14 @@ function makeFeatureGetter(style) {
     if (features.length < 1) return false;
 
     return { type: "FeatureCollection", features: features };
-  }
+  };
 }
 
-function loadStyle(style, mbToken, canvasSize) {
-
-  // Get a Promise that resolves to a Mapbox style document
-  const getStyleJson = (typeof style === "object")
-    ? Promise.resolve(style)                // style is JSON already
-    : getJSON( expandStyleURL(style, mbToken) ); // Get from URL
-
-
-  // Now set up a Promise chain to process the document
-  return getStyleJson
-    .then( expandLayerReferences )
-
-    .then( retrieveSourceInfo )
-
+function loadStyle(styleURL, mapboxToken, canvasSize) {
+  return parseStyle(styleURL, mapboxToken)
     .then( addPainterFunctions );
 
-
-  function retrieveSourceInfo(styleDoc) {
-    const getSprite = loadSprite(styleDoc, mbToken);
-
-    const expandSources = Object.keys(styleDoc.sources)
-      .map(key => expandSource(key, styleDoc.sources, mbToken));
-
-    return Promise.all([...expandSources, getSprite])
-      .then(() => styleDoc);
-  }
-
+  // TODO: move this boilerplate to tile-painter?
   function addPainterFunctions(styleDoc) {
     styleDoc.layers.forEach(layer => {
       layer.painter = initPainter({
@@ -1681,33 +1787,7 @@ function loadStyle(style, mbToken, canvasSize) {
         spriteObject: styleDoc.spriteData,
       });
     });
-
     return styleDoc;
-  }
-}
-
-function loadSprite(styleDoc, token) {
-  if (!styleDoc.sprite) return;
-
-  const urls = expandSpriteURLs(styleDoc.sprite, token);
-
-  return Promise.all([getImage(urls.image), getJSON(urls.meta)])
-    .then(([image, meta]) => { styleDoc.spriteData = { image, meta }; });
-}
-
-function expandSource(key, sources, token) {
-  var source = sources[key];
-  if (source.url === undefined) return; // No change
-
-  // Load the referenced TileJSON document
-  return getJSON( expandTileURL(source.url, token) )
-    .then(json => merge(json));
-
-  function merge(json) {
-    // Add any custom properties from the style document
-    Object.keys(source).forEach( k2 => { json[k2] = source[k2]; } );
-    // Replace current entry with the TileJSON data
-    sources[key] = json;
   }
 }
 
@@ -1957,7 +2037,7 @@ function initChunkQueue() {
   }
 }
 
-function initRenderer(canvSize, styleGroups) {
+function initRenderer$1(canvSize, styleGroups) {
   // Input canvSize is an integer, for the pixel size of the (square) tiles
   var activeDrawCalls = 0;
 
@@ -2091,7 +2171,7 @@ function init(params) {
 
     tileFactory = initTileFactory(canvSize, styleDoc.sources, 
       styleGroups, readThread);
-    renderer = initRenderer(canvSize, styleGroups);
+    renderer = initRenderer$1(canvSize, styleGroups);
 
     // Update api
     api.style = styleDoc;
