@@ -1,5 +1,6 @@
 import { initWorker } from "./load-mvt/boss.js";
-import { loadStyle } from "./style.js";
+import { parseStyle } from 'tile-stencil';
+import { addPainters } from 'tile-painter';
 import { initGroups } from "./groups.js";
 import { initTileFactory } from "./tile.js";
 import { initRenderer } from "./renderer.js";
@@ -37,7 +38,8 @@ export function init(params) {
   };
 
   // Get the style info
-  loadStyle(styleURL, mbToken, canvSize)
+  parseStyle(styleURL, mbToken)
+    .then( style => addPainters(style, canvSize) )
     .then( setup )
     .catch(err => callback(err));
 
