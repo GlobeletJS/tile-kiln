@@ -764,314 +764,40 @@ function writeUtf8(buf, str, pos) {
     return pos;
 }
 
-/**
- * A standalone point geometry with useful accessor, comparison, and
- * modification methods.
- *
- * @class Point
- * @param {Number} x the x-coordinate. this could be longitude or screen
- * pixels, or any other sort of unit.
- * @param {Number} y the y-coordinate. this could be latitude or screen
- * pixels, or any other sort of unit.
- * @example
- * var point = new Point(-77, 38);
- */
-function Point(x, y) {
-    this.x = x;
-    this.y = y;
+function classifyRings(rings) {
+  // Classifies an array of rings into polygons with outer rings and holes
+  if (rings.length <= 1) return [rings];
+
+  var polygons = [];
+  var polygon, ccw;
+
+  rings.forEach(ring => {
+    let area = signedArea(ring);
+    if (area === 0) return;
+
+    if (ccw === undefined) ccw = area < 0;
+
+    if (ccw === area < 0) {
+      if (polygon) polygons.push(polygon);
+      polygon = [ring];
+
+    } else {
+      polygon.push(ring);
+    }
+  });
+  if (polygon) polygons.push(polygon);
+
+  return polygons;
 }
 
-Point.prototype = {
+function signedArea(ring) {
+  const xmul = (p1, p2) => (p2.x - p1.x) * (p1.y + p2.y);
 
-    /**
-     * Clone this point, returning a new point that can be modified
-     * without affecting the old one.
-     * @return {Point} the clone
-     */
-    clone: function() { return new Point(this.x, this.y); },
+  const initialValue = xmul(ring[0], ring[ring.length - 1]);
 
-    /**
-     * Add this point's x & y coordinates to another point,
-     * yielding a new point.
-     * @param {Point} p the other point
-     * @return {Point} output point
-     */
-    add:     function(p) { return this.clone()._add(p); },
-
-    /**
-     * Subtract this point's x & y coordinates to from point,
-     * yielding a new point.
-     * @param {Point} p the other point
-     * @return {Point} output point
-     */
-    sub:     function(p) { return this.clone()._sub(p); },
-
-    /**
-     * Multiply this point's x & y coordinates by point,
-     * yielding a new point.
-     * @param {Point} p the other point
-     * @return {Point} output point
-     */
-    multByPoint:    function(p) { return this.clone()._multByPoint(p); },
-
-    /**
-     * Divide this point's x & y coordinates by point,
-     * yielding a new point.
-     * @param {Point} p the other point
-     * @return {Point} output point
-     */
-    divByPoint:     function(p) { return this.clone()._divByPoint(p); },
-
-    /**
-     * Multiply this point's x & y coordinates by a factor,
-     * yielding a new point.
-     * @param {Point} k factor
-     * @return {Point} output point
-     */
-    mult:    function(k) { return this.clone()._mult(k); },
-
-    /**
-     * Divide this point's x & y coordinates by a factor,
-     * yielding a new point.
-     * @param {Point} k factor
-     * @return {Point} output point
-     */
-    div:     function(k) { return this.clone()._div(k); },
-
-    /**
-     * Rotate this point around the 0, 0 origin by an angle a,
-     * given in radians
-     * @param {Number} a angle to rotate around, in radians
-     * @return {Point} output point
-     */
-    rotate:  function(a) { return this.clone()._rotate(a); },
-
-    /**
-     * Rotate this point around p point by an angle a,
-     * given in radians
-     * @param {Number} a angle to rotate around, in radians
-     * @param {Point} p Point to rotate around
-     * @return {Point} output point
-     */
-    rotateAround:  function(a,p) { return this.clone()._rotateAround(a,p); },
-
-    /**
-     * Multiply this point by a 4x1 transformation matrix
-     * @param {Array<Number>} m transformation matrix
-     * @return {Point} output point
-     */
-    matMult: function(m) { return this.clone()._matMult(m); },
-
-    /**
-     * Calculate this point but as a unit vector from 0, 0, meaning
-     * that the distance from the resulting point to the 0, 0
-     * coordinate will be equal to 1 and the angle from the resulting
-     * point to the 0, 0 coordinate will be the same as before.
-     * @return {Point} unit vector point
-     */
-    unit:    function() { return this.clone()._unit(); },
-
-    /**
-     * Compute a perpendicular point, where the new y coordinate
-     * is the old x coordinate and the new x coordinate is the old y
-     * coordinate multiplied by -1
-     * @return {Point} perpendicular point
-     */
-    perp:    function() { return this.clone()._perp(); },
-
-    /**
-     * Return a version of this point with the x & y coordinates
-     * rounded to integers.
-     * @return {Point} rounded point
-     */
-    round:   function() { return this.clone()._round(); },
-
-    /**
-     * Return the magitude of this point: this is the Euclidean
-     * distance from the 0, 0 coordinate to this point's x and y
-     * coordinates.
-     * @return {Number} magnitude
-     */
-    mag: function() {
-        return Math.sqrt(this.x * this.x + this.y * this.y);
-    },
-
-    /**
-     * Judge whether this point is equal to another point, returning
-     * true or false.
-     * @param {Point} other the other point
-     * @return {boolean} whether the points are equal
-     */
-    equals: function(other) {
-        return this.x === other.x &&
-               this.y === other.y;
-    },
-
-    /**
-     * Calculate the distance from this point to another point
-     * @param {Point} p the other point
-     * @return {Number} distance
-     */
-    dist: function(p) {
-        return Math.sqrt(this.distSqr(p));
-    },
-
-    /**
-     * Calculate the distance from this point to another point,
-     * without the square root step. Useful if you're comparing
-     * relative distances.
-     * @param {Point} p the other point
-     * @return {Number} distance
-     */
-    distSqr: function(p) {
-        var dx = p.x - this.x,
-            dy = p.y - this.y;
-        return dx * dx + dy * dy;
-    },
-
-    /**
-     * Get the angle from the 0, 0 coordinate to this point, in radians
-     * coordinates.
-     * @return {Number} angle
-     */
-    angle: function() {
-        return Math.atan2(this.y, this.x);
-    },
-
-    /**
-     * Get the angle from this point to another point, in radians
-     * @param {Point} b the other point
-     * @return {Number} angle
-     */
-    angleTo: function(b) {
-        return Math.atan2(this.y - b.y, this.x - b.x);
-    },
-
-    /**
-     * Get the angle between this point and another point, in radians
-     * @param {Point} b the other point
-     * @return {Number} angle
-     */
-    angleWith: function(b) {
-        return this.angleWithSep(b.x, b.y);
-    },
-
-    /*
-     * Find the angle of the two vectors, solving the formula for
-     * the cross product a x b = |a||b|sin(θ) for θ.
-     * @param {Number} x the x-coordinate
-     * @param {Number} y the y-coordinate
-     * @return {Number} the angle in radians
-     */
-    angleWithSep: function(x, y) {
-        return Math.atan2(
-            this.x * y - this.y * x,
-            this.x * x + this.y * y);
-    },
-
-    _matMult: function(m) {
-        var x = m[0] * this.x + m[1] * this.y,
-            y = m[2] * this.x + m[3] * this.y;
-        this.x = x;
-        this.y = y;
-        return this;
-    },
-
-    _add: function(p) {
-        this.x += p.x;
-        this.y += p.y;
-        return this;
-    },
-
-    _sub: function(p) {
-        this.x -= p.x;
-        this.y -= p.y;
-        return this;
-    },
-
-    _mult: function(k) {
-        this.x *= k;
-        this.y *= k;
-        return this;
-    },
-
-    _div: function(k) {
-        this.x /= k;
-        this.y /= k;
-        return this;
-    },
-
-    _multByPoint: function(p) {
-        this.x *= p.x;
-        this.y *= p.y;
-        return this;
-    },
-
-    _divByPoint: function(p) {
-        this.x /= p.x;
-        this.y /= p.y;
-        return this;
-    },
-
-    _unit: function() {
-        this._div(this.mag());
-        return this;
-    },
-
-    _perp: function() {
-        var y = this.y;
-        this.y = this.x;
-        this.x = -y;
-        return this;
-    },
-
-    _rotate: function(angle) {
-        var cos = Math.cos(angle),
-            sin = Math.sin(angle),
-            x = cos * this.x - sin * this.y,
-            y = sin * this.x + cos * this.y;
-        this.x = x;
-        this.y = y;
-        return this;
-    },
-
-    _rotateAround: function(angle, p) {
-        var cos = Math.cos(angle),
-            sin = Math.sin(angle),
-            x = p.x + cos * (this.x - p.x) - sin * (this.y - p.y),
-            y = p.y + sin * (this.x - p.x) + cos * (this.y - p.y);
-        this.x = x;
-        this.y = y;
-        return this;
-    },
-
-    _round: function() {
-        this.x = Math.round(this.x);
-        this.y = Math.round(this.y);
-        return this;
-    }
-};
-
-/**
- * Construct a point from an array if necessary, otherwise if the input
- * is already a Point, or an unknown type, return it unchanged
- * @param {Array<Number>|Point|*} a any kind of input value
- * @return {Point} constructed point, or passed-through value.
- * @example
- * // this
- * var point = Point.convert([0, 1]);
- * // is equivalent to
- * var point = new Point(0, 1);
- */
-Point.convert = function (a) {
-    if (a instanceof Point) {
-        return a;
-    }
-    if (Array.isArray(a)) {
-        return new Point(a[0], a[1]);
-    }
-    return a;
-};
+  return ring.slice(1)  // NOTE: skips ring[0], shifts index
+    .reduce( (sum, p1, i) => sum + xmul(p1, ring[i]), initialValue );
+}
 
 function VectorTileFeature(pbf, end, extent, keys, values) {
   // Public
@@ -1112,12 +838,12 @@ VectorTileFeature.prototype.loadGeometry = function() {
   pbf.pos = this._geometry;
 
   var end = pbf.readVarint() + pbf.pos,
-  cmd = 1,
-  length = 0,
-  x = 0,
-  y = 0,
-  lines = [],
-  line;
+    cmd = 1,
+    length = 0,
+    x = 0,
+    y = 0,
+    lines = [],
+    line;
 
   while (pbf.pos < end) {
     if (length <= 0) {
@@ -1137,14 +863,14 @@ VectorTileFeature.prototype.loadGeometry = function() {
         line = [];
       }
 
-      line.push(new Point(x, y));
+      line.push({ x, y });
 
     } else if (cmd === 7) {
-
       // Workaround for https://github.com/mapbox/mapnik-vector-tile/issues/90
-      if (line) {
-        line.push(line[0].clone()); // closePolygon
-      }
+      if (line) line.push({ // closePolygon
+        x: line[0].x,
+        y: line[0].y
+      });
 
     } else {
       throw new Error('unknown command ' + cmd);
@@ -1197,54 +923,30 @@ VectorTileFeature.prototype.bbox = function() {
 
 VectorTileFeature.prototype.toGeoJSON = function(size, sx = 0, sy = 0) {
   // Input size is the side length of the (square) area over which the
-  //  coordinate space of this tile [0, this.extent] will be rendered
+  //  coordinate space of this tile [0, this.extent] will be rendered.
   // Input sx, sy is the origin (top left corner) of the output coordinates
-  //  within the (size x size) rendered area of the full tile. This is
-  //  analogous to the sx, sy parameters in the HTML Canvas2D drawImage method,
-  //  where we are treating this tile as a source image of width, height = size.
-  // NOTE that this vector tile may contain "buffer" points outside the area
-  //  (this.extent x this.extent), which will also fall outside (size x size)
-  //  These points should be ignored, i.e, ensure 0 < sx,sy < size , and
-  //  discard points with output coordinates outside [0, size]
+  //  within the (size x size) rendered area of the full tile.
 
   var scale = size / this.extent,
-  coords = this.loadGeometry(),
-  type = VectorTileFeature.types[this.type],
-  i, j;
+    coords = this.loadGeometry(),
+    type = VectorTileFeature.types[this.type];
 
   function project(line) {
-    for (var j = 0; j < line.length; j++) {
-      var p = line[j];
-      line[j] = [
-        p.x * scale - sx,
-        p.y * scale - sy,
-      ];
-    }
+    return line.map(p => [p.x * scale - sx, p.y * scale - sy]);
   }
 
-  switch (this.type) {
-    case 1:
-      var points = [];
-      for (i = 0; i < coords.length; i++) {
-        points[i] = coords[i][0];
-      }
-      coords = points;
-      project(coords);
+  switch (type) {
+    case "Point":
+      coords = project( coords.map(p => p[0]) );
       break;
 
-    case 2:
-      for (i = 0; i < coords.length; i++) {
-        project(coords[i]);
-      }
+    case "LineString":
+      coords = coords.map(project);
       break;
 
-    case 3:
+    case "Polygon":
       coords = classifyRings(coords);
-      for (i = 0; i < coords.length; i++) {
-        for (j = 0; j < coords[i].length; j++) {
-          project(coords[i][j]);
-        }
-      }
+      coords = coords.map(polygon => polygon.map(project));
       break;
   }
 
@@ -1263,52 +965,10 @@ VectorTileFeature.prototype.toGeoJSON = function(size, sx = 0, sy = 0) {
     properties: this.properties
   };
 
-  if ('id' in this) {
-    result.id = this.id;
-  }
+  if ('id' in this) result.id = this.id;
 
   return result;
 };
-
-// classifies an array of rings into polygons with outer rings and holes
-
-function classifyRings(rings) {
-  var len = rings.length;
-
-  if (len <= 1) return [rings];
-
-  var polygons = [],
-  polygon,
-  ccw;
-
-  for (var i = 0; i < len; i++) {
-    var area = signedArea(rings[i]);
-    if (area === 0) continue;
-
-    if (ccw === undefined) ccw = area < 0;
-
-    if (ccw === area < 0) {
-      if (polygon) polygons.push(polygon);
-      polygon = [rings[i]];
-
-    } else {
-      polygon.push(rings[i]);
-    }
-  }
-  if (polygon) polygons.push(polygon);
-
-  return polygons;
-}
-
-function signedArea(ring) {
-  var sum = 0;
-  for (var i = 0, len = ring.length, j = len - 1, p1, p2; i < len; j = i++) {
-    p1 = ring[i];
-    p2 = ring[j];
-    sum += (p2.x - p1.x) * (p1.y + p2.y);
-  }
-  return sum;
-}
 
 function VectorTileLayer(pbf, end) {
   // Public
@@ -1366,6 +1026,14 @@ VectorTileLayer.prototype.feature = function(i) {
   return new VectorTileFeature(this._pbf, end, this.extent, this._keys, this._values);
 };
 
+VectorTileLayer.prototype.toGeoJSON = function(size, sx, sy) {
+  const features = Array.from(Array(this._features.length), (v, i) => {
+    return this.feature(i).toGeoJSON(size, sx, sy);
+  });
+
+  return { type: "FeatureCollection", features };
+};
+
 function VectorTile(pbf, end) {
   this.layers = pbf.readFields(readTile, {}, end);
 }
@@ -1389,8 +1057,7 @@ function readMVT(dataHref, size, callback) {
   function parseMVT(err, data) {
     if (err) return callback(err, data);
 
-    const pbuffer = new pbf( new Uint8Array(data) );
-    const tile = new VectorTile(pbuffer);
+    const tile = new VectorTile(new pbf(data));
     const jsonLayers = mvtToJSON(tile, size);
 
     callback(null, jsonLayers);
@@ -1398,21 +1065,14 @@ function readMVT(dataHref, size, callback) {
 }
 
 function mvtToJSON(tile, size) {
-  // tile.layers is an object (not array!). In Mapbox Streets, it is an
-  // object of { name: layer, } pairs, where name = layer.name. 
+  // tile.layers is an object (not array!). In Mapbox Streets, it is an object
+  // of { name: layer } pairs, where name = layer.name. 
   // But this is not mentioned in the spec! So we use layer.name for safety
   const jsonLayers = {};
   Object.values(tile.layers).forEach(layer => {
-    jsonLayers[layer.name] = layerToJSON(layer, size);
+    jsonLayers[layer.name] = layer.toGeoJSON(size);
   });
   return jsonLayers;
-}
-
-function layerToJSON(layer, size) {
-  const getFeature = (i) => layer.feature(i).toGeoJSON(size);
-  const features = Array.from(Array(layer.length), (v, i) => getFeature(i));
-
-  return { type: "FeatureCollection", features: features };
 }
 
 function mergeMacrostrat(layer) {

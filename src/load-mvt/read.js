@@ -1,6 +1,6 @@
 import { xhrGet } from "./xhrGet.js";
 import Protobuf from 'pbf';
-import { VectorTile } from 'vector-tile-js';
+import { VectorTile } from 'vector-tile-esm';
 
 export function readMVT(dataHref, size, callback) {
   // Input dataHref is the path to a file containing a Mapbox Vector Tile
@@ -14,8 +14,7 @@ export function readMVT(dataHref, size, callback) {
   function parseMVT(err, data) {
     if (err) return callback(err, data);
 
-    const pbuffer = new Protobuf( new Uint8Array(data) );
-    const tile = new VectorTile(pbuffer);
+    const tile = new VectorTile(new Protobuf(data));
     const jsonLayers = mvtToJSON(tile, size);
 
     callback(null, jsonLayers);
@@ -23,19 +22,12 @@ export function readMVT(dataHref, size, callback) {
 }
 
 function mvtToJSON(tile, size) {
-  // tile.layers is an object (not array!). In Mapbox Streets, it is an
-  // object of { name: layer, } pairs, where name = layer.name. 
+  // tile.layers is an object (not array!). In Mapbox Streets, it is an object
+  // of { name: layer } pairs, where name = layer.name. 
   // But this is not mentioned in the spec! So we use layer.name for safety
   const jsonLayers = {};
   Object.values(tile.layers).forEach(layer => {
-    jsonLayers[layer.name] = layerToJSON(layer, size);
+    jsonLayers[layer.name] = layer.toGeoJSON(size);
   });
   return jsonLayers;
-}
-
-function layerToJSON(layer, size) {
-  const getFeature = (i) => layer.feature(i).toGeoJSON(size);
-  const features = Array.from(Array(layer.length), (v, i) => getFeature(i));
-
-  return { type: "FeatureCollection", features: features };
 }

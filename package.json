@@ -47,7 +47,7 @@
     "pbf": "^3.2.1",
     "tile-painter": "^0.1.0",
     "tile-stencil": "0.0.1",
-    "vector-tile-js": "github:jjhembd/vector-tile-js",
+    "vector-tile-esm": "^2.1.0",
     "zero-timeout": "0.0.2"
   }
 }
