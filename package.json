@@ -45,8 +45,8 @@
   },
   "dependencies": {
     "pbf": "^3.2.1",
-    "tile-painter": "^0.1.0",
-    "tile-stencil": "0.0.1",
+    "tile-painter": "^0.1.2",
+    "tile-stencil": "^0.1.2",
     "vector-tile-esm": "^2.1.0",
     "zero-timeout": "0.0.2"
   }

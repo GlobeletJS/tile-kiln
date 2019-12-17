@@ -1,10 +1,12 @@
+import { initWorker } from "./load-mvt/boss.js";
 import { loadImage } from "./image.js";
 
-export function initTileFactory(size, sources, styleGroups, loader) {
+export function initTileFactory(size, sources) {
   // Input size is the pixel size of the canvas used for vector rendering
   // Input sources is an OBJECT of TileJSON descriptions of tilesets
-  // Input styleGroups is an ARRAY of objects { name, visible } for groupings of
-  // style layers that will be rendered to separate canvases before compositing
+
+  // Initialize a worker thread to read and parse MVT tiles
+  const loader = initWorker("./worker.bundle.js");
 
   // For now we ignore sources that don't have tile endpoints
   const tileSourceKeys = Object.keys(sources).filter( k => {
@@ -12,10 +14,9 @@ export function initTileFactory(size, sources, styleGroups, loader) {
   });
 
   function orderTile(z, x, y, callback = () => true) {
-    const loadTasks = {};
+    let img = document.createElement("canvas");
+    img.width = img.height = size;
     const cancelers = [];
-    var numToDo = tileSourceKeys.length;
-    var baseLamina = initLamina(size);
 
     const tile = {
       z, x, y,
@@ -23,25 +24,20 @@ export function initTileFactory(size, sources, styleGroups, loader) {
       priority: 0,
 
       sources: {},
-      laminae: {},
-      img: baseLamina.img,
-      ctx: baseLamina.ctx,
-
       loaded: false,
+
+      img,
+      ctx: img.getContext("2d"),
+      rendering: false,
+      rendered: false,
+
       storeCanceler: (canceler) => cancelers.push(canceler),
       cancel,
       canceled: false,
-      rendering: baseLamina.rendering,
-      rendered: baseLamina.rendered,
     };
 
-    // Add canvases for separate rendering of layer groups, if supplied
-    if (styleGroups && styleGroups.length > 1) {
-      styleGroups.forEach( group => {
-        tile.laminae[group.name] = initLamina(size);
-      });
-    }
-
+    const loadTasks = {};
+    var numToDo = tileSourceKeys.length;
     tileSourceKeys.forEach( loadTile );
 
     function loadTile(srcKey) {
@@ -80,15 +76,6 @@ export function initTileFactory(size, sources, styleGroups, loader) {
   }
 
   return orderTile;
-}
-
-function initLamina(size) {
-  let img = document.createElement("canvas");
-  img.width = size;
-  img.height = size;
-  let ctx = img.getContext("2d");
-  ctx.save(); // Save default styles
-  return { img, ctx, rendering: false, rendered: false };
 }
 
 function tileURL(endpoint, z, x, y) {

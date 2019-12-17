@@ -38,3 +38,24 @@ function sortStyleGroup(layers, groupName) {
   // Append reordered symbol layers to non-symbol layers
   return group.filter(layer => layer.type !== "symbol").concat(labels);
 }
+
+export function addLaminae(tile, groups) {
+  tile.laminae = {};
+
+  groups.forEach(group => {
+    let img = document.createElement("canvas");
+    img.width = img.height = tile.img.width;
+
+    tile.laminae[group.name] = {
+      z: tile.z,
+      x: tile.x,
+      y: tile.y,
+
+      sources: tile.sources,
+
+      img,
+      ctx: img.getContext("2d"),
+      rendered: false,
+    };
+  });
+}

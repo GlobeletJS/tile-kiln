@@ -1,7 +1,6 @@
-import { initWorker } from "./load-mvt/boss.js";
 import { parseStyle } from 'tile-stencil';
 import { addPainters } from 'tile-painter';
-import { initGroups } from "./groups.js";
+import { initGroups, addLaminae } from "./groups.js";
 import { initTileFactory } from "./tile.js";
 import { initRenderer } from "./renderer.js";
 
@@ -21,12 +20,7 @@ export function init(params) {
     if (group) group.visible = visibility;
   }
 
-  // Initialize a worker thread to read and parse MVT tiles
-  const readThread = initWorker("./worker.bundle.js");
-
   const api = { // Initialize properties, update when styles load
-    style: {},    // WARNING: directly modifiable from calling program
-
     create: () => undefined,
     hideGroup: (name) => setGroupVisibility(name, false),
     showGroup: (name) => setGroupVisibility(name, true),
@@ -48,12 +42,11 @@ export function init(params) {
   function setup(styleDoc) {
     styleGroups = initGroups(styleDoc);
 
-    tileFactory = initTileFactory(canvSize, styleDoc.sources, 
-      styleGroups, readThread);
-    renderer = initRenderer(canvSize, styleGroups);
+    tileFactory = initTileFactory(canvSize, styleDoc.sources);
+    renderer = initRenderer(styleGroups);
 
     // Update api
-    api.style = styleDoc;
+    api.style = styleDoc; // WARNING: directly modifiable from calling program
     api.create = create;
 
     api.redraw = renderer.draw;
@@ -67,9 +60,13 @@ export function init(params) {
 
   function create(z, x, y, cb = () => undefined, reportTime) {
     if (reportTime) t0 = performance.now();
+
     var tile = tileFactory(z, x, y, render);
+
     function render(err) {
-      if (err) cb(err);
+      if (err) return cb(err);
+
+      if (styleGroups.length > 1) addLaminae(tile, styleGroups);
 
       var wrapCb = cb;
       if (reportTime) {
@@ -77,20 +74,13 @@ export function init(params) {
         cb("Calling drawAll");
         // Wrap the callback to add time reporting
         wrapCb = (msg, data) => {
-          if (msg === "progress") {
-            let dt = (performance.now() - t0).toFixed(1);
-            return cb("check: " + data + ", dt = " + dt + "ms");
-          } else if (msg === null) {
-            t2 = performance.now();
-            return cb(null, data, t2 - t1, t1 - t0);
-          } else {
-            console.log("ERROR in wrapCb: don't understand the message");
-            return cb(msg);
-          }
+          t2 = performance.now();
+          return cb(null, data, t2 - t1, t1 - t0);
         };
       }
       renderer.draw(tile, wrapCb, reportTime);
     }
+
     return tile;
   }
 }

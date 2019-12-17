@@ -1,5 +1,4 @@
 import { readMVT } from "./read.js";
-import { mergeMacrostrat } from "./macrostrat.js";
 
 const tasks = {};
 
@@ -36,11 +35,6 @@ function sendHeader(id, err, result) {
   if (err) {
     delete tasks[id];
     return postMessage({ id, type: "error", payload: err });
-  }
-
-  if (result["units"] !== undefined) {
-    // Merge Macrostrat polygons with the same .id
-    result["units"] = mergeMacrostrat(result["units"]);
   }
 
   task.result = result;

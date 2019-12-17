@@ -1,87 +1,3 @@
-// Wrapper for worker threads to enable a callback interface
-// Inspired by https://codeburst.io/promises-for-the-web-worker-9311b7831733
-function initWorker(codeHref) {
-
-  const tasks = {};
-  let globalMsgId = 0;
-  let activeTasks = 0;
-
-  const worker = new Worker(codeHref);
-  worker.onmessage = handleMsg;
-
-  return {
-    startTask,
-    cancelTask,
-    numActive: () => activeTasks,
-    terminate: worker.terminate,
-  }
-
-  function startTask(payload, callback) {
-    activeTasks ++;
-    const msgId = globalMsgId++;
-    tasks[msgId] = { callback };
-    worker.postMessage({ id: msgId, type: "start", payload });
-    return msgId; // Returned ID can be used for later cancellation
-  }
-
-  function cancelTask(id) {
-    if (tasks[id]) worker.postMessage({ id, type: "cancel" });
-    return delete tasks[id];
-  }
-
-  function handleMsg(msgEvent) {
-    const msg = msgEvent.data; // { id, type, key, payload }
-    const task = tasks[msg.id];
-    if (!task) return worker.postMessage({ id: msg.id, type: "cancel" });
-
-    switch (msg.type) {
-      case "error":
-        task.callback(msg.payload);
-        break; // Clean up below
-
-      case "header":
-        task.header = msg.payload;
-        task.result = initJSON(msg.payload);
-        return worker.postMessage({ id: msg.id, type: "continue" });
-
-      case "data": 
-        let features = task.result[msg.key].features;
-        msg.payload.forEach( feature => features.push(feature) );
-        return worker.postMessage({ id: msg.id, type: "continue" });
-
-      case "done":
-        let err = checkJSON(task.result, task.header)
-          ? null
-          : "ERROR: JSON from worker failed checks!";
-        task.callback(err, task.result);
-        break; // Clean up below
-
-      default:
-        task.callback("ERROR: worker sent bad message type!");
-        break; // Clean up below
-    }
-
-    delete tasks[msg.id];
-    activeTasks --;
-  }
-}
-
-function initJSON(header) {
-  const json = {};
-  Object.keys(header).forEach(key => {
-    json[key] = { type: "FeatureCollection", features: [] };
-  });
-  return json;
-}
-
-function checkJSON(json, header) {
-  return Object.keys(header).every(checkFeatureCount);
-
-  function checkFeatureCount(key) {
-    return json[key].features.length === header[key];
-  }
-}
-
 // From mapbox-gl-js, style-spec/deref.js
 const refProperties = [
   'type', 
@@ -92,11 +8,6 @@ const refProperties = [
   'filter', 
   'layout'
 ];
-
-function expandLayerReferences(styleDoc) {
-  styleDoc.layers = derefLayers(styleDoc.layers);
-  return styleDoc;
-}
 
 /**
  * Given an array of layers, some of which may contain `ref` properties
@@ -669,9 +580,15 @@ const layoutDefaults = {
   "circle": {
     "visibility": "visible",
   },
-  // "fill-extrusion": {},
-  // "heatmap": {},
-  // "hillshade": {},
+  "fill-extrusion": {
+    "visibility": "visible",
+  },
+  "heatmap": {
+    "visibility": "visible",
+  },
+  "hillshade": {
+    "visibility": "visible",
+  },
 };
 
 const paintDefaults = {
@@ -743,73 +660,106 @@ const paintDefaults = {
     "circle-stroke-color": "#000000",
     "circle-stroke-opacity": 1,
   },
-  // "fill-extrusion": {},
-  // "heatmap": {},
-  // "hillshade": {},
+  "fill-extrusion": {
+    "fill-extrusion-opacity": 1,
+    "fill-extrusion-color": "#000000",
+    "fill-extrusion-translate": [0, 0],
+    "fill-extrusion-translate-anchor": "map",
+    "fill-extrusion-height": 0,
+    "fill-extrusion-base": 0,
+    "fill-extrusion-vertical-gradient": true,
+  },
+  "heatmap": {
+    "heatmap-radius": 30,
+    "heatmap-weight": 1,
+    "heatmap-intensity": 1,
+    "heatmap-color": ["interpolate",["linear"],["heatmap-density"],0,"rgba(0, 0, 255,0)",0.1,"royalblue",0.3,"cyan",0.5,"lime",0.7,"yellow",1,"red"],
+    "heatmap-opacity": 1,
+  },
+  "hillshade": {
+    "hillshade-illumination-direction": 335,
+    "hillshade-illumination-anchor": "viewport",
+    "hillshade-exaggeration": 0.5,
+    "hillshade-shadow-color": "#000000",
+    "hillshade-highlight-color": "#FFFFFF",
+    "hillshade-accent-color": "#000000",
+  },
 };
 
-function parseLayer(layer) {
-  // NOTE: modifies input layer!
+function parseLayer(inputLayer) {
+  // Make a shallow copy of the layer, to leave the input unchanged
+  const layer = Object.assign({}, inputLayer);
+
+  // Replace filter and rendering properties with functions
   layer.filter = buildFeatureFilter(layer.filter);
   layer.layout = autoGetters(layer.layout, layoutDefaults[layer.type]);
   layer.paint  = autoGetters(layer.paint,  paintDefaults[layer.type] );
+
   return layer;
 }
 
 function parseStyle(style, mapboxToken) {
-  // Get a Promise that resolves to a Mapbox style document
+  // Get a Promise that resolves to a raw Mapbox style document
   const getStyleJson = (typeof style === "object")
     ? Promise.resolve(style)                // style is JSON already
     : getJSON( expandStyleURL(style, mapboxToken) ); // Get from URL
 
-  // Now set up a Promise chain to process the document
-  return getStyleJson
-    .then( expandLayerReferences )
+  // Set up an asynchronous function to process the document
+  function parseStyleJson(rawStyleDoc) {
+    // Make a shallow copy of the document, to leave the input unchanged
+    const styleDoc = Object.assign({}, rawStyleDoc);
 
-    .then( retrieveSourceInfo )
+    // Expand layer references, then parse
+    styleDoc.layers = derefLayers(styleDoc.layers).map(parseLayer);
 
-    .then( parseLayers );
+    // Get linked info for sources and sprites
+    const sourcePromise = expandSources(styleDoc.sources, mapboxToken);
+    const spritePromise = loadSprite(styleDoc.sprite, mapboxToken);
 
-  // Gets data from referenced URLs, and attaches it to the style
-  function retrieveSourceInfo(styleDoc) {
-    const getSprite = loadSprite(styleDoc, mapboxToken);
-
-    const expandSources = Object.keys(styleDoc.sources)
-      .map(key => expandSource(key, styleDoc.sources, mapboxToken));
-
-    return Promise.all([...expandSources, getSprite])
-      .then(() => styleDoc);
+    return Promise.all([sourcePromise, spritePromise])
+      .then( ([sources, spriteData]) => {
+        styleDoc.sources = sources;
+        styleDoc.spriteData = spriteData;
+        return styleDoc;
+      });
   }
+
+  // Chain together and return
+  return getStyleJson.then( parseStyleJson );
 }
 
-function parseLayers(styleDoc) {
-  styleDoc.layers.forEach(parseLayer);
-  return styleDoc;
+function expandSources(rawSources, token) {
+  const expandPromises = Object.entries(rawSources).map(expandSource);
+
+  function expandSource([key, rawSource]) {
+    // Make a shallow copy of the input. Note: some properties may still be
+    // pointing back to the original style document, like .vector_layers,
+    // .bounds, .center, .extent
+    const source = Object.assign({}, rawSource);
+
+    if (source.url === undefined) return [key, source]; // No change
+
+    // Load the referenced TileJSON document, and copy its values to source
+    return getJSON( expandTileURL(source.url, token) )
+      .then( tileJson => [key, Object.assign(source, tileJson)] );
+  }
+
+  function combineSources(keySourcePairs) {
+    const sources = {};
+    keySourcePairs.forEach( ([key, val]) => { sources[key] = val; } );
+    return sources;
+  }
+
+  return Promise.all( expandPromises ).then( combineSources );
 }
 
-function loadSprite(styleDoc, token) {
-  if (!styleDoc.sprite) return;
+function loadSprite(sprite, token) {
+  if (!sprite) return;
 
-  const urls = expandSpriteURLs(styleDoc.sprite, token);
+  const urls = expandSpriteURLs(sprite, token);
 
   return Promise.all([getImage(urls.image), getJSON(urls.meta)])
-    .then(([image, meta]) => { styleDoc.spriteData = { image, meta }; });
-}
-
-function expandSource(key, sources, token) {
-  var source = sources[key];
-  if (source.url === undefined) return; // No change
-
-  // Load the referenced TileJSON document
-  return getJSON( expandTileURL(source.url, token) )
-    .then(json => merge(json));
-
-  function merge(json) {
-    // Add any custom properties from the style document
-    Object.keys(source).forEach( k2 => { json[k2] = source[k2]; } );
-    // Replace current entry with the TileJSON data
-    sources[key] = json;
-  }
+    .then( ([image, meta]) => ({ image, meta }) );
 }
 
 // Renders layers that cover the whole tile (like painting with a roller)
@@ -1382,8 +1332,6 @@ function addStylesToFeatures(propFuncs, zoom, data) {
   return styledFeatures.sort( (a, b) => (a.styleID < b.styleID) ? -1 : 1 );
 }
 
-// Renders discrete lines, points, polygons... like painting with a brush
-
 function canv(property) {
   // Create a default state setter for a Canvas 2D renderer
   return (val, ctx) => { ctx[property] = val; };
@@ -1393,6 +1341,30 @@ function pair(getStyle, setState) {
   // Return a style value getter and a renderer state setter as a paired object
   return { getStyle, setState };
 }
+
+function makePatternSetter(sprite) {
+  return function(spriteID, ctx) {
+    const sMeta = sprite.meta[spriteID];
+    const patternCanvas = document.createElement("canvas");
+    patternCanvas.width = sMeta.width;
+    patternCanvas.height = sMeta.height;
+    const pCtx = patternCanvas.getContext("2d");
+    pCtx.drawImage(
+      sprite.image, 
+      sMeta.x, 
+      sMeta.y, 
+      sMeta.width, 
+      sMeta.height,
+      0,
+      0,
+      sMeta.width,
+      sMeta.height
+    );
+    ctx.fillStyle = ctx.createPattern(patternCanvas, "repeat");
+  };
+}
+
+// Renders discrete lines, points, polygons... like painting with a brush
 
 function initCircle(layout, paint) {
   const setRadius = (radius, ctx, path) => {
@@ -1428,13 +1400,25 @@ function initLine(layout, paint) {
   return initBrush({ setters, methods });
 }
 
-function initFill(layout, paint) {
+function initFill(layout, paint, sprite) {
+  var getStyle, setState;
+
+  let pattern = paint["fill-pattern"];
+  if (pattern.type !== "constant" || pattern() !== undefined) {
+    // Fill with a repeated sprite. Style getter returns sprite name
+    getStyle = pattern;
+    setState = makePatternSetter(sprite);
+  } else {
+    // Fill with a solid color
+    getStyle = paint["fill-color"];
+    setState = canv("fillStyle");
+  }
+
   const setters = [
-    pair(paint["fill-color"],     canv("fillStyle")),
+    pair(getStyle, setState),
     pair(paint["fill-opacity"],   canv("globalAlpha")),
     // fill-translate, 
     // fill-translate-anchor,
-    // fill-pattern,
   ];
   const methods = ["fill"];
 
@@ -1806,7 +1790,7 @@ function makePaintFunction(style, sprite, canvasSize) {
     case "line":
       return initLine(style.layout, style.paint);
     case "fill":
-      return initFill(style.layout, style.paint);
+      return initFill(style.layout, style.paint, sprite);
     case "fill-extrusion":
     case "heatmap":
     case "hillshade":
@@ -1925,6 +1909,111 @@ function sortStyleGroup(layers, groupName) {
   return group.filter(layer => layer.type !== "symbol").concat(labels);
 }
 
+function addLaminae(tile, groups) {
+  tile.laminae = {};
+
+  groups.forEach(group => {
+    let img = document.createElement("canvas");
+    img.width = img.height = tile.img.width;
+
+    tile.laminae[group.name] = {
+      z: tile.z,
+      x: tile.x,
+      y: tile.y,
+
+      sources: tile.sources,
+
+      img,
+      ctx: img.getContext("2d"),
+      rendered: false,
+    };
+  });
+}
+
+// Wrapper for worker threads to enable a callback interface
+// Inspired by https://codeburst.io/promises-for-the-web-worker-9311b7831733
+function initWorker(codeHref) {
+
+  const tasks = {};
+  let globalMsgId = 0;
+  let activeTasks = 0;
+
+  const worker = new Worker(codeHref);
+  worker.onmessage = handleMsg;
+
+  return {
+    startTask,
+    cancelTask,
+    numActive: () => activeTasks,
+    terminate: worker.terminate,
+  }
+
+  function startTask(payload, callback) {
+    activeTasks ++;
+    const msgId = globalMsgId++;
+    tasks[msgId] = { callback };
+    worker.postMessage({ id: msgId, type: "start", payload });
+    return msgId; // Returned ID can be used for later cancellation
+  }
+
+  function cancelTask(id) {
+    if (tasks[id]) worker.postMessage({ id, type: "cancel" });
+    return delete tasks[id];
+  }
+
+  function handleMsg(msgEvent) {
+    const msg = msgEvent.data; // { id, type, key, payload }
+    const task = tasks[msg.id];
+    if (!task) return worker.postMessage({ id: msg.id, type: "cancel" });
+
+    switch (msg.type) {
+      case "error":
+        task.callback(msg.payload);
+        break; // Clean up below
+
+      case "header":
+        task.header = msg.payload;
+        task.result = initJSON(msg.payload);
+        return worker.postMessage({ id: msg.id, type: "continue" });
+
+      case "data": 
+        let features = task.result[msg.key].features;
+        msg.payload.forEach( feature => features.push(feature) );
+        return worker.postMessage({ id: msg.id, type: "continue" });
+
+      case "done":
+        let err = checkJSON(task.result, task.header)
+          ? null
+          : "ERROR: JSON from worker failed checks!";
+        task.callback(err, task.result);
+        break; // Clean up below
+
+      default:
+        task.callback("ERROR: worker sent bad message type!");
+        break; // Clean up below
+    }
+
+    delete tasks[msg.id];
+    activeTasks --;
+  }
+}
+
+function initJSON(header) {
+  const json = {};
+  Object.keys(header).forEach(key => {
+    json[key] = { type: "FeatureCollection", features: [] };
+  });
+  return json;
+}
+
+function checkJSON(json, header) {
+  return Object.keys(header).every(checkFeatureCount);
+
+  function checkFeatureCount(key) {
+    return json[key].features.length === header[key];
+  }
+}
+
 function loadImage(href, callback) {
   const errMsg = "ERROR in loadImage for href " + href;
   const img = new Image();
@@ -1941,11 +2030,12 @@ function loadImage(href, callback) {
   return img;
 }
 
-function initTileFactory(size, sources, styleGroups, loader) {
+function initTileFactory(size, sources) {
   // Input size is the pixel size of the canvas used for vector rendering
   // Input sources is an OBJECT of TileJSON descriptions of tilesets
-  // Input styleGroups is an ARRAY of objects { name, visible } for groupings of
-  // style layers that will be rendered to separate canvases before compositing
+
+  // Initialize a worker thread to read and parse MVT tiles
+  const loader = initWorker("./worker.bundle.js");
 
   // For now we ignore sources that don't have tile endpoints
   const tileSourceKeys = Object.keys(sources).filter( k => {
@@ -1953,10 +2043,9 @@ function initTileFactory(size, sources, styleGroups, loader) {
   });
 
   function orderTile(z, x, y, callback = () => true) {
-    const loadTasks = {};
+    let img = document.createElement("canvas");
+    img.width = img.height = size;
     const cancelers = [];
-    var numToDo = tileSourceKeys.length;
-    var baseLamina = initLamina(size);
 
     const tile = {
       z, x, y,
@@ -1964,25 +2053,20 @@ function initTileFactory(size, sources, styleGroups, loader) {
       priority: 0,
 
       sources: {},
-      laminae: {},
-      img: baseLamina.img,
-      ctx: baseLamina.ctx,
-
       loaded: false,
+
+      img,
+      ctx: img.getContext("2d"),
+      rendering: false,
+      rendered: false,
+
       storeCanceler: (canceler) => cancelers.push(canceler),
       cancel,
       canceled: false,
-      rendering: baseLamina.rendering,
-      rendered: baseLamina.rendered,
     };
 
-    // Add canvases for separate rendering of layer groups, if supplied
-    if (styleGroups && styleGroups.length > 1) {
-      styleGroups.forEach( group => {
-        tile.laminae[group.name] = initLamina(size);
-      });
-    }
-
+    const loadTasks = {};
+    var numToDo = tileSourceKeys.length;
     tileSourceKeys.forEach( loadTile );
 
     function loadTile(srcKey) {
@@ -2021,15 +2105,6 @@ function initTileFactory(size, sources, styleGroups, loader) {
   }
 
   return orderTile;
-}
-
-function initLamina(size) {
-  let img = document.createElement("canvas");
-  img.width = size;
-  img.height = size;
-  let ctx = img.getContext("2d");
-  ctx.save(); // Save default styles
-  return { img, ctx, rendering: false, rendered: false };
 }
 
 function tileURL(endpoint, z, x, y) {
@@ -2130,30 +2205,14 @@ function initChunkQueue() {
   }
 }
 
-function initRenderer(canvSize, styleGroups) {
-  // Input canvSize is an integer, for the pixel size of the (square) tiles
+function initRenderer(styleGroups) {
   var activeDrawCalls = 0;
 
   const queue = initChunkQueue();
 
-  var getLamina, composite;
-  if (styleGroups.length > 1) { 
-    // Define function to return the appropriate lamina (partial rendering)
-    getLamina = (tile, groupName) => tile.laminae[groupName];
-    // Define function to composite all laminae canvases into the main canvas
-    composite = (tile) => {
-      tile.ctx.clearRect(0, 0, canvSize, canvSize);
-      styleGroups.forEach( group => {
-        if (!group.visible) return;
-        tile.ctx.drawImage(tile.laminae[group.name].img, 0, 0);
-      });
-    };
-  } else {
-    // Only one group of style layers. Render directly to the main canvas
-    getLamina = (tile, groupName) => tile;
-    // Compositing is not needed: return a dummy no-op function
-    composite = (tile) => true;
-  }
+  const chainDrawCalls = (styleGroups.length === 1)
+    ? (tile) => getDrawFuncs(tile, styleGroups[0].layers)
+    : (tile) => groupDrawCalls(tile, styleGroups);
 
   return {
     draw: drawAll,
@@ -2169,12 +2228,9 @@ function initRenderer(canvSize, styleGroups) {
     tile.rendering = true;
     activeDrawCalls ++;
 
-    // Make an array of functions to draw all the layers of every group
-    const drawCalls = [];
-    styleGroups
-      .filter(grp => grp.visible)
-      .forEach( group => drawCalls.push(...makeDrawCalls(group)) );
-    drawCalls.push(putTogether);
+    // Make an array of functions to draw all the layers
+    const drawCalls = chainDrawCalls(tile);
+    drawCalls.push(finishTile);
 
     // Submit this array to the task queue
     let renderTaskId = queue.enqueueTask({
@@ -2185,39 +2241,47 @@ function initRenderer(canvSize, styleGroups) {
     // Tell the tile how to cancel the render task
     tile.storeCanceler(() => queue.cancelTask(renderTaskId));
 
-    function makeDrawCalls(group) {
-      let drawFuncs = getDrawFuncs(tile, group);
-      drawFuncs.push(() => { if (verbose) callback("progress", group.name); });
-      return drawFuncs;
-    }
-
-    function putTogether() {
-      composite(tile);
-
-      tile.rendered = true;
+    function finishTile() {
       tile.rendering = false;
       activeDrawCalls --;
-
       return callback(null, tile);
     }
   }
+}
 
-  function getDrawFuncs(tile, layerGroup) {
-    let lamina = getLamina(tile, layerGroup.name);
-    if (lamina.rendered) return [() => true];
+function groupDrawCalls(tile, styleGroups) {
+  const drawCalls = styleGroups
+    .filter( group => group.visible )
+    .flatMap( group => getDrawFuncs(tile.laminae[group.name], group.layers) );
 
-    lamina.ctx.clearRect(0, 0, canvSize, canvSize);
-    const boundingBoxes = [];
-
-    // Create an array of painter calls, one for each layer.
-    const drawCalls = layerGroup.layers.map(layer => {
-      return () => layer.painter(lamina.ctx, tile.z, tile.sources, boundingBoxes);
+  function composite() {
+    tile.ctx.clearRect(0, 0, tile.img.width, tile.img.height);
+    styleGroups.forEach( group => {
+      if (!group.visible) return;
+      tile.ctx.drawImage(tile.laminae[group.name].img, 0, 0);
     });
-
-    // Add a function to update the rendered flag
-    drawCalls.push(() => { lamina.rendered = true; });
-    return drawCalls;
+    tile.rendered = true;
   }
+
+  drawCalls.push(composite);
+  return drawCalls;
+}
+
+
+function getDrawFuncs(tile, layers) {
+  if (tile.rendered) return [() => true];
+
+  tile.ctx.clearRect(0, 0, tile.img.width, tile.img.height);
+  const boundingBoxes = [];
+
+  // Create an array of painter calls, one for each layer.
+  const drawCalls = layers.map(layer => {
+    return () => layer.painter(tile.ctx, tile.z, tile.sources, boundingBoxes);
+  });
+
+  // Add a function to update the rendered flag
+  drawCalls.push(() => { tile.rendered = true; });
+  return drawCalls;
 }
 
 function init(params) {
@@ -2236,12 +2300,7 @@ function init(params) {
     if (group) group.visible = visibility;
   }
 
-  // Initialize a worker thread to read and parse MVT tiles
-  const readThread = initWorker("./worker.bundle.js");
-
   const api = { // Initialize properties, update when styles load
-    style: {},    // WARNING: directly modifiable from calling program
-
     create: () => undefined,
     hideGroup: (name) => setGroupVisibility(name, false),
     showGroup: (name) => setGroupVisibility(name, true),
@@ -2263,12 +2322,11 @@ function init(params) {
   function setup(styleDoc) {
     styleGroups = initGroups(styleDoc);
 
-    tileFactory = initTileFactory(canvSize, styleDoc.sources, 
-      styleGroups, readThread);
-    renderer = initRenderer(canvSize, styleGroups);
+    tileFactory = initTileFactory(canvSize, styleDoc.sources);
+    renderer = initRenderer(styleGroups);
 
     // Update api
-    api.style = styleDoc;
+    api.style = styleDoc; // WARNING: directly modifiable from calling program
     api.create = create;
 
     api.redraw = renderer.draw;
@@ -2282,9 +2340,13 @@ function init(params) {
 
   function create(z, x, y, cb = () => undefined, reportTime) {
     if (reportTime) t0 = performance.now();
+
     var tile = tileFactory(z, x, y, render);
+
     function render(err) {
-      if (err) cb(err);
+      if (err) return cb(err);
+
+      if (styleGroups.length > 1) addLaminae(tile, styleGroups);
 
       var wrapCb = cb;
       if (reportTime) {
@@ -2292,20 +2354,13 @@ function init(params) {
         cb("Calling drawAll");
         // Wrap the callback to add time reporting
         wrapCb = (msg, data) => {
-          if (msg === "progress") {
-            let dt = (performance.now() - t0).toFixed(1);
-            return cb("check: " + data + ", dt = " + dt + "ms");
-          } else if (msg === null) {
-            t2 = performance.now();
-            return cb(null, data, t2 - t1, t1 - t0);
-          } else {
-            console.log("ERROR in wrapCb: don't understand the message");
-            return cb(msg);
-          }
+          t2 = performance.now();
+          return cb(null, data, t2 - t1, t1 - t0);
         };
       }
       renderer.draw(tile, wrapCb, reportTime);
     }
+
     return tile;
   }
 }
