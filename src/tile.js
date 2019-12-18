@@ -28,7 +28,6 @@ export function initTileFactory(size, sources) {
 
       img,
       ctx: img.getContext("2d"),
-      rendering: false,
       rendered: false,
 
       storeCanceler: (canceler) => cancelers.push(canceler),

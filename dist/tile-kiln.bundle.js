@@ -2057,7 +2057,6 @@ function initTileFactory(size, sources) {
 
       img,
       ctx: img.getContext("2d"),
-      rendering: false,
       rendered: false,
 
       storeCanceler: (canceler) => cancelers.push(canceler),
@@ -2292,7 +2291,7 @@ function init(params) {
   var callback = params.callback || ( () => undefined );
 
   // Declare some variables & methods that will be defined inside a callback
-  var tileFactory, renderer, t0, t1, t2;
+  var tileFactory, renderer;
   var styleGroups = [];
 
   function setGroupVisibility(name, visibility) {
@@ -2339,7 +2338,7 @@ function init(params) {
   }
 
   function create(z, x, y, cb = () => undefined, reportTime) {
-    if (reportTime) t0 = performance.now();
+    let t0 = performance.now();
 
     var tile = tileFactory(z, x, y, render);
 
@@ -2350,11 +2349,11 @@ function init(params) {
 
       var wrapCb = cb;
       if (reportTime) {
-        t1 = performance.now();
+        let t1 = performance.now();
         cb("Calling drawAll");
         // Wrap the callback to add time reporting
         wrapCb = (msg, data) => {
-          t2 = performance.now();
+          let t2 = performance.now();
           return cb(null, data, t2 - t1, t1 - t0);
         };
       }
