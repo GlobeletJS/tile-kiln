@@ -739,9 +739,9 @@ function expandSources(rawSources, token) {
 
     if (source.url === undefined) return [key, source]; // No change
 
-    // Load the referenced TileJSON document, and copy its values to source
+    // Load the referenced TileJSON document, add any values from source
     return getJSON( expandTileURL(source.url, token) )
-      .then( tileJson => [key, Object.assign(source, tileJson)] );
+      .then( tileJson => [key, Object.assign(tileJson, source)] );
   }
 
   function combineSources(keySourcePairs) {

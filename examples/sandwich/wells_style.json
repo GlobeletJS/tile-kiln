@@ -38,7 +38,7 @@
       "type": "circle",
       "source": "wells",
       "source-layer": "TWDB_Groundwater_v2",
-      "filter": ["==", "title", "2862305"],
+      "filter": ["==", "title", "5858901"],
       "paint": {
         "circle-radius": 5.0,
         "circle-color": "#FF0000"
