@@ -38,23 +38,21 @@ function setup(styleDoc, canvSize) {
     let t0 = performance.now();
 
     var tile = tileFactory(z, x, y, render);
+    if (styleGroups.length > 1) addLaminae(tile, styleGroups);
 
     function render(err) {
       if (err) return cb(err);
 
-      if (styleGroups.length > 1) addLaminae(tile, styleGroups);
-
+      // Wrap the callback to add time reporting
       var wrapCb = cb;
       if (reportTime) {
         let t1 = performance.now();
-        cb("Calling drawAll");
-        // Wrap the callback to add time reporting
         wrapCb = (msg, data) => {
           let t2 = performance.now();
           return cb(null, data, t2 - t1, t1 - t0);
         };
       }
-      renderer.draw(tile, wrapCb, reportTime);
+      renderer.draw(tile, wrapCb);
     }
 
     return tile;

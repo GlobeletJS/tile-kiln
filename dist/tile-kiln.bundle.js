@@ -731,13 +731,11 @@ function parseStyle(style, mapboxToken) {
 function expandSources(rawSources, token) {
   const expandPromises = Object.entries(rawSources).map(expandSource);
 
-  function expandSource([key, rawSource]) {
-    // Make a shallow copy of the input. Note: some properties may still be
-    // pointing back to the original style document, like .vector_layers,
-    // .bounds, .center, .extent
-    const source = Object.assign({}, rawSource);
-
-    if (source.url === undefined) return [key, source]; // No change
+  function expandSource([key, source]) {
+    // If no .url, return a shallow copy of the input. 
+    // Note: some properties may still be pointing back to the original 
+    // style document, like .vector_layers, .bounds, .center, .extent
+    if (source.url === undefined) return [key, Object.assign({}, source)];
 
     // Load the referenced TileJSON document, add any values from source
     return getJSON( expandTileURL(source.url, token) )
@@ -2219,7 +2217,7 @@ function initRenderer(styleGroups) {
     sortTasks: queue.sortTasks,
   };
 
-  function drawAll(tile, callback = () => true, verbose) {
+  function drawAll(tile, callback = () => true) {
     if (tile.canceled || !tile.loaded) return;
     if (tile.rendered || tile.rendering) return; // Duplicate call?
 
@@ -2317,23 +2315,21 @@ function setup(styleDoc, canvSize) {
     let t0 = performance.now();
 
     var tile = tileFactory(z, x, y, render);
+    if (styleGroups.length > 1) addLaminae(tile, styleGroups);
 
     function render(err) {
       if (err) return cb(err);
 
-      if (styleGroups.length > 1) addLaminae(tile, styleGroups);
-
+      // Wrap the callback to add time reporting
       var wrapCb = cb;
       if (reportTime) {
         let t1 = performance.now();
-        cb("Calling drawAll");
-        // Wrap the callback to add time reporting
         wrapCb = (msg, data) => {
           let t2 = performance.now();
           return cb(null, data, t2 - t1, t1 - t0);
         };
       }
-      renderer.draw(tile, wrapCb, reportTime);
+      renderer.draw(tile, wrapCb);
     }
 
     return tile;

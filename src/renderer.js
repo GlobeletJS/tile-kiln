@@ -15,7 +15,7 @@ export function initRenderer(styleGroups) {
     sortTasks: queue.sortTasks,
   };
 
-  function drawAll(tile, callback = () => true, verbose) {
+  function drawAll(tile, callback = () => true) {
     if (tile.canceled || !tile.loaded) return;
     if (tile.rendered || tile.rendering) return; // Duplicate call?
 
