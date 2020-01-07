@@ -1,5 +1,6 @@
 import { initWorker } from "./load-mvt/boss.js";
 import { loadImage } from "./image.js";
+import { loadGeotiff } from "./imageGeotiff.js";
 
 export function initTileFactory(size, sources) {
   // Input size is the pixel size of the canvas used for vector rendering
@@ -41,14 +42,26 @@ export function initTileFactory(size, sources) {
 
     function loadTile(srcKey) {
       var src = sources[srcKey];
-      var tileHref = tileURL(src.tiles[0], z, x, y);
+      if (src.type === "geotiff"){
+        var z_gdal=src.maxzoom-z; //maxzoom= number of zoom levels gdal created
+        var x_gdal=y+1;
+        var y_gdal=x+1;
+        if (z>3 & x_gdal<10){x_gdal = "0"+x_gdal;}
+        if (z>3 & y_gdal<10){y_gdal = "0"+y_gdal;}
+        var tileHref = tileURL(src.tiles[0], z_gdal, x_gdal, y_gdal);
+      }else{
+        var tileHref = tileURL(src.tiles[0], z, x, y);
+      }
+      
       if (src.type === "vector") {
         //readMVT( tileHref, size, (err, data) => checkData(err, srcKey, data) );
         let readCallback = (err, data) => checkData(err, srcKey, data);
         let readPayload = { href: tileHref, size: size };
         loadTasks[srcKey] = loader.startTask(readPayload, readCallback);
-      } else if (src.type === "raster") {
+      } else if (src.type === "raster") { 
         loadImage( tileHref, (err, data) => checkData(err, srcKey, data) );
+      } else if (src.type === "geotiff") {
+        loadGeotiff( tileHref, (err, data) => checkData(err, srcKey, data) );
       }
     }
 
@@ -63,8 +76,8 @@ export function initTileFactory(size, sources) {
       // one layer, but we may still be able to render the other layers
       if (err) console.log(err);
       // TODO: maybe stop if all layers have errors?
-
       tile.sources[key] = data;
+      
       delete loadTasks[key];
       if (--numToDo > 0) return;
 
