@@ -14,6 +14,9 @@ export function main() {
 
 function setup(api) {
   // Get a link to the tile coordinates printout
+  const canvas = document.getElementById("map");
+  canvas.width = canvas.height = 512;
+  const dctx = canvas.getContext("2d");
   var title = document.getElementById("zxy");
   const coords = { z: 5, x: 6, y: 12 };
 
@@ -34,8 +37,6 @@ function setup(api) {
     // Copy the renderer canvas onto our display canvas
     var t2, t3, t4;
     t2=performance.now();
-    var width = 512;
-    var height = 512;
     var loop1=tile.sources.bedrock.length;
     var bedrock=[];
     for (var i=0; i<loop1; i++){
@@ -43,8 +44,8 @@ function setup(api) {
     }
     t3=performance.now();
     var plot = new plotty.plot({
-      canvas: document.getElementById("map"),
-      data: bedrock, width: width, height: height,
+      canvas: dctx.canvas,
+      data: bedrock, width: dctx.canvas.width, height: dctx.canvas.height,
       domain: [Math.log(100), Math.log(30000)], colorScale: 'ylgnbu'
     });
     plot.render();
