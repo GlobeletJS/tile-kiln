@@ -14,15 +14,4 @@ export default [{
     format: 'esm',
     name: pkg.name
   }
-}, {
-  input: 'src/load-mvt/worker.js',
-  plugins: [
-    resolve(),
-    commonjs(),
-  ],
-  output: {
-    file: 'dist/worker.bundle.js',
-    format: 'esm',
-    name: pkg.name,
-  },
 }];

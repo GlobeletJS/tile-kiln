@@ -31,18 +31,24 @@ function setup(api) {
 
   // Set up toggle for burwell polygons
   var burwellVisible = true;
+  const burwellLayers = api.style.layers
+    .filter(l => l["tilekiln-group"] === "burwell")
+    .map(l => l.id);
   document.getElementById("toggleBurwell")
     .addEventListener("click", () => {
       burwellVisible = !burwellVisible;
-      setVisibility("burwell", burwellVisible);
+      setVisibility(burwellLayers, burwellVisible);
     }, false);
 
   // Set up toggle for labels
   var labelsVisible = true;
+  const labelLayers = api.style.layers
+    .filter(l => l["tilekiln-group"] === "labels")
+    .map(l => l.id);
   document.getElementById("toggleLabels")
     .addEventListener("click", () => {
       labelsVisible = !labelsVisible;
-      setVisibility("labels", labelsVisible);
+      setVisibility(labelLayers, labelsVisible);
     }, false);
 
   // Define misc functions
@@ -50,19 +56,20 @@ function setup(api) {
     currentTile = api.create(coords.z, coords.x, coords.y, display, true);
   }
 
-  function display(err, tile, time) {
+  function display(err, tile, renderTime, loadTime) {
     if (err) return console.log(err);
     // Copy the renderer canvas onto our display canvas
     dctx.drawImage(tile.img, 0, 0);
     title.innerHTML = "z/x/y = " + coords.z + "/" + coords.x + "/" + coords.y;
-    info.innerHTML = "Render time: " + Math.round(time) + "ms";
+    if (loadTime) info.innerHTML = "Load time: " + loadTime.toFixed(3) + "ms";
+    if (renderTime) info.innerHTML += "<br>Render time: " + renderTime.toFixed(3) + "ms";
   }
 
-  function setVisibility(group, visibility) {
+  function setVisibility(layers, visibility) {
     if (visibility) {
-      api.showGroup(group);
+      layers.forEach(layer => api.showLayer(layer));
     } else {
-      api.hideGroup(group);
+      layers.forEach(layer => api.hideLayer(layer));
     }
     currentTile.rendered = false;
     api.redraw(currentTile, display);

@@ -27,6 +27,7 @@
       "type": "circle",
       "source": "wells",
       "source-layer": "TWDB_Groundwater_v2",
+      "interactive": true,
       "paint": {
         "circle-radius": 2.5,
         "circle-color": "#0022EE"

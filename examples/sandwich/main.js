@@ -51,7 +51,7 @@ function setup(api) {
     var x = cursor.x() - box.left;
     var y = cursor.y() - box.top;
     var layers = currentTile.sources["wells"];
-    var data = layers["TWDB_Groundwater_v2"];
+    var data = layers["twdb-groundwater-v2"];
     var feature = findNearest(x, y, 5, data.features);
     // Print to info div
     info.innerHTML = "<pre>" + JSON.stringify(feature, null, 2) + "</pre>";
@@ -71,7 +71,6 @@ function setup(api) {
     // into the painter function, so we need to re-initialize the painter
     highlighter.filter = f => f.properties.title === selectedTitle;
 
-    currentTile.laminae["highlight"].rendered = false;
     currentTile.rendered = false;
     api.redraw(currentTile, display);
   }

@@ -29,7 +29,8 @@ function setup(api) {
   // Set up toggle for hillshade visibility
   var hillshadeVisible = true;
   const hillshadeLayers = api.style.layers
-    .filter(layer => layer["source-layer"] === "hillshade");
+    .filter(layer => layer["source-layer"] === "hillshade")
+    .map(layer => layer.id);
   document.getElementById("toggleLines")
     .addEventListener("click", () => {
       linesVisible = !linesVisible;
@@ -39,7 +40,8 @@ function setup(api) {
   // Set up toggle for lines visibility
   var linesVisible = true;
   const linesLayers = api.style.layers
-    .filter(layer => layer.type === "line");
+    .filter(layer => layer.type === "line")
+    .map(layer => layer.id);
   document.getElementById("toggleHillshade")
     .addEventListener("click", () => {
       hillshadeVisible = !hillshadeVisible;
@@ -58,9 +60,11 @@ function setup(api) {
   }
 
   function setVisibility(layers, visibility) {
-    let visText = visibility ? "visible" : "none";
-    layers.forEach(layer => { layer.layout.visibility = visText; });
-
+    if (visibility) {
+      layers.forEach(layer => api.showLayer(layer));
+    } else {
+      layers.forEach(layer => api.hideLayer(layer));
+    }
     currentTile.rendered = false;
     api.redraw(currentTile, display);
   }

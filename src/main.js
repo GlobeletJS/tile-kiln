@@ -1,46 +1,68 @@
-import { parseStyle } from 'tile-stencil';
-import { addPainters } from 'tile-painter';
-import { initGroups, addLaminae } from "./groups.js";
+import { loadStyle, getStyleFuncs } from 'tile-stencil';
+import { initPainter } from 'tile-painter';
 import { initTileFactory } from "./tile.js";
-import { initRenderer } from "./renderer.js";
 
 export function init(params) {
   // Process parameters, substituting defaults as needed
   var canvSize = params.size || 512;
   var styleURL = params.style;   // REQUIRED
   var mbToken  = params.token;   // May be undefined
+  var nThreads = params.threads || 4;
 
   // Get the style info, then set everything up
-  return parseStyle(styleURL, mbToken)
-    .then( style => addPainters(style, canvSize) )
-    .then( style => setup(style, canvSize) );
+  return loadStyle(styleURL, mbToken)
+    .then( style => setup(style, canvSize, nThreads) );
 }
 
-function setup(styleDoc, canvSize) {
-  const styleGroups = initGroups(styleDoc);
+function setup(styleDoc, canvasSize, nThreads) {
+  const tileFactory = initTileFactory(styleDoc, canvasSize, nThreads);
+  const spriteObject = styleDoc.spriteData;
 
-  const tileFactory = initTileFactory(canvSize, styleDoc.sources);
-  const renderer = initRenderer(styleGroups);
+  // Reverse the order of the symbol layers, for correct collision checking
+  const labels = styleDoc.layers
+    .filter(l => l.type === "symbol");
+  const layers = styleDoc.layers
+    .filter( l => l.type !== "symbol" )
+    .concat( labels.reverse() )
+    .map( getStyleFuncs )
+    .map( makeLayerFunc );
+
+  function makeLayerFunc(styleLayer) {
+    const paint = initPainter({ styleLayer, spriteObject, canvasSize });
+    return { paint, id: styleLayer.id, visible: true };
+  }
+
+  function setLayerVisibility(id, visibility) {
+    var layer = layers.find(l => l.id === id);
+    if (layer) layer.visible = visibility;
+  }
+
+  function render(tile, callback) {
+    const bboxes = [];
+    layers.forEach(layer => {
+      if (!layer.visible) return;
+      layer.paint(tile.ctx, tile.z, tile.sources, bboxes);
+    });
+    return callback(null, tile);
+  }
 
   return {
     style: styleDoc, // WARNING: directly modifiable from calling program
 
     create,
-    redraw: renderer.draw,
-    hideGroup: (name) => setGroupVisibility(name, false),
-    showGroup: (name) => setGroupVisibility(name, true),
+    redraw: render,
+    hideLayer: (id) => setLayerVisibility(id, false),
+    showLayer: (id) => setLayerVisibility(id, true),
 
-    activeDrawCalls: renderer.activeDrawCalls,
-    sortTasks: renderer.sortTasks,
+    sortTasks: tileFactory.sortTasks,
   };
 
   function create(z, x, y, cb = () => undefined, reportTime) {
     let t0 = performance.now();
 
-    var tile = tileFactory(z, x, y, render);
-    if (styleGroups.length > 1) addLaminae(tile, styleGroups);
+    var tile = tileFactory.order(z, x, y, reportAndRender);
 
-    function render(err) {
+    function reportAndRender(err) {
       if (err) return cb(err);
 
       // Wrap the callback to add time reporting
@@ -52,14 +74,9 @@ function setup(styleDoc, canvSize) {
           return cb(null, data, t2 - t1, t1 - t0);
         };
       }
-      renderer.draw(tile, wrapCb);
+      render(tile, wrapCb);
     }
 
     return tile;
-  }
-
-  function setGroupVisibility(name, visibility) {
-    var group = styleGroups.find(group => group.name === name);
-    if (group) group.visible = visibility;
   }
 }

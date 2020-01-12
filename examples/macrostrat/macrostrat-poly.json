@@ -1,0 +1,74 @@
+{
+  "version": 8,
+  "name": "Macrostrat",
+  "sources": {
+    "burwell": {
+      "type": "vector",
+      "tiles": [
+        "https://tiles.macrostrat.org/carto/{z}/{x}/{y}.mvt"
+      ],
+      "tileSize": 512
+    }
+  },
+  "visibility": "public",
+  "layers": [
+    { "id": "background",
+      "tilekiln-group": "basemap",
+      "type": "background",
+      "layout": { },
+      "paint": {
+        "background-color": {
+          "base": 1,
+          "stops": [[11, "hsl(0, 0%, 94%)"], [13, "hsl(0, 0%, 90%)"]]
+        }
+      }
+    },
+    {
+      "id": "burwell_fill",
+      "tilekiln-group": "burwell",
+      "type": "fill",
+      "source": "burwell",
+      "source-layer": "units",
+      "filter": ["!=", "color", ""],
+      "minzoom": 0,
+      "maxzoom": 16,
+      "paint": {
+        "fill-color": {
+          "property": "color",
+          "type": "identity"
+        },
+        "fill-opacity": {
+          "stops": [
+            [0, 0.5],
+            [12, 0.3]
+          ]
+        },
+        "fill-outline-color": {
+          "property": "color",
+          "type": "identity"
+        },
+        "fill-outline-width": {
+          "stops": [
+            [0, 0.15],
+            [1, 0.15],
+            [2, 0.15],
+            [3, 0.15],
+            [4, 0.2],
+            [5, 0.4],
+            [6, 0.05],
+            [7, 0.1],
+            [8, 0.4],
+            [9, 0.5],
+            [10, 0.35],
+            [11, 0.4],
+            [12, 1],
+            [13, 1.25],
+            [14, 1.5],
+            [15, 1.75],
+            [16, 2]
+          ]
+        }
+      }
+    }
+  ]
+}

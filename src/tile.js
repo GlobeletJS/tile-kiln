@@ -1,82 +1,46 @@
-import { initWorker } from "./load-mvt/boss.js";
-import { loadImage } from "./image.js";
+import { initSources } from "./sources.js";
 
-export function initTileFactory(size, sources) {
-  // Input size is the pixel size of the canvas used for vector rendering
-  // Input sources is an OBJECT of TileJSON descriptions of tilesets
+export function initTileFactory(styleDoc, canvasSize, nThreads) {
 
-  // Initialize a worker thread to read and parse MVT tiles
-  const loader = initWorker("./worker.bundle.js");
+  const retriever = initSources(styleDoc, nThreads);
 
-  // For now we ignore sources that don't have tile endpoints
-  const tileSourceKeys = Object.keys(sources).filter( k => {
-    return sources[k].tiles && sources[k].tiles.length > 0;
-  });
-
-  function orderTile(z, x, y, callback = () => true) {
+  function order(z, x, y, callback = () => true) {
     let img = document.createElement("canvas");
-    img.width = img.height = size;
-    const cancelers = [];
+    img.width = img.height = canvasSize;
 
     const tile = {
       z, x, y,
       id: z + "/" + x + "/" + y,
       priority: 0,
 
-      sources: {},
-      loaded: false,
-
       img,
       ctx: img.getContext("2d"),
       rendered: false,
-
-      storeCanceler: (canceler) => cancelers.push(canceler),
-      cancel,
-      canceled: false,
     };
 
-    const loadTasks = {};
-    var numToDo = tileSourceKeys.length;
-    tileSourceKeys.forEach( loadTile );
+    const loadTask = retriever.collect({
+      z, x, y,
+      getPriority: () => tile.priority,
+      callback: addData,
+    });
 
-    function loadTile(srcKey) {
-      var src = sources[srcKey];
-      var tileHref = tileURL(src.tiles[0], z, x, y);
-      if (src.type === "vector") {
-        //readMVT( tileHref, size, (err, data) => checkData(err, srcKey, data) );
-        let readCallback = (err, data) => checkData(err, srcKey, data);
-        let readPayload = { href: tileHref, size: size };
-        loadTasks[srcKey] = loader.startTask(readPayload, readCallback);
-      } else if (src.type === "raster") {
-        loadImage( tileHref, (err, data) => checkData(err, srcKey, data) );
-      }
-    }
-
-    function cancel() {
-      while (cancelers.length > 0) cancelers.shift()();
-      Object.values(loadTasks).forEach(task => loader.cancelTask(task));
+    tile.cancel = () => {
+      loadTask.cancel();
       tile.canceled = true;
     }
 
-    function checkData(err, key, data) {
-      // If data retrieval errors, don't stop. We could be out of the range of
-      // one layer, but we may still be able to render the other layers
+    function addData(err, data) {
       if (err) console.log(err);
-      // TODO: maybe stop if all layers have errors?
-
-      tile.sources[key] = data;
-      delete loadTasks[key];
-      if (--numToDo > 0) return;
-
+      tile.sources = data;
       tile.loaded = true;
       return callback(null, tile);
     }
+
     return tile;
   }
 
-  return orderTile;
-}
-
-function tileURL(endpoint, z, x, y) {
-  return endpoint.replace(/{z}/, z).replace(/{x}/, x).replace(/{y}/, y);
+  return { 
+    order,
+    sortTasks: retriever.sortTasks,
+  };
 }
