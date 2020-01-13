@@ -1706,13 +1706,24 @@ function init(params) {
   var mbToken  = params.token;   // May be undefined
   var nThreads = params.threads || 4;
 
-  // Get the style info, then set everything up
-  return loadStyle(styleURL, mbToken)
-    .then( style => setup(style, canvSize, nThreads) );
+  // Create dummy API for instant return
+  const api = {
+    create: () => null,
+    redraw: () => null,
+    hideLayer: () => null,
+    showLayer: () => null,
+    sortTasks: () => null,
+  };
+
+  // Load the style, and then set everything up
+  api.promise = loadStyle(styleURL, mbToken)
+    .then( styleDoc => setup(styleDoc, canvSize, nThreads, api) );
+
+  return api;
 }
 
-function setup(styleDoc, canvasSize, nThreads) {
-  const tileFactory = initTileFactory(styleDoc, canvasSize, nThreads);
+function setup(styleDoc, canvSize, nThreads, api) {
+  const tileFactory = initTileFactory(styleDoc, canvSize, nThreads);
   const spriteObject = styleDoc.spriteData;
 
   // Reverse the order of the symbol layers, for correct collision checking
@@ -1725,7 +1736,7 @@ function setup(styleDoc, canvasSize, nThreads) {
     .map( makeLayerFunc );
 
   function makeLayerFunc(styleLayer) {
-    const paint = initPainter({ styleLayer, spriteObject, canvasSize });
+    const paint = initPainter({ styleLayer, spriteObject, canvSize });
     return { paint, id: styleLayer.id, visible: true };
   }
 
@@ -1734,48 +1745,45 @@ function setup(styleDoc, canvasSize, nThreads) {
     if (layer) layer.visible = visibility;
   }
 
-  function render(tile, callback) {
+  function render(tile, callback = () => true) {
+    if (tile.canceled || !tile.loaded || tile.rendered) return;
     const bboxes = [];
     layers.forEach(layer => {
       if (!layer.visible) return;
       layer.paint(tile.ctx, tile.z, tile.sources, bboxes);
     });
+    tile.rendered = true;
     return callback(null, tile);
   }
-
-  return {
-    style: styleDoc, // WARNING: directly modifiable from calling program
-
-    create,
-    redraw: render,
-    hideLayer: (id) => setLayerVisibility(id, false),
-    showLayer: (id) => setLayerVisibility(id, true),
-
-    sortTasks: tileFactory.sortTasks,
-  };
 
   function create(z, x, y, cb = () => undefined, reportTime) {
     let t0 = performance.now();
 
-    var tile = tileFactory.order(z, x, y, reportAndRender);
-
-    function reportAndRender(err) {
+    // Wrap the callback to add time reporting
+    function orderTimer(err, tile) { // Track ordering time
       if (err) return cb(err);
+      let t1 = performance.now();
 
-      // Wrap the callback to add time reporting
-      var wrapCb = cb;
-      if (reportTime) {
-        let t1 = performance.now();
-        wrapCb = (msg, data) => {
-          let t2 = performance.now();
-          return cb(null, data, t2 - t1, t1 - t0);
-        };
+      function renderTimer(msg, data) { // Track rendering time
+        let t2 = performance.now();
+        cb(msg, data, t2 - t1, t1 - t0);
       }
-      render(tile, wrapCb);
+
+      render(tile, renderTimer);
     }
 
-    return tile;
+    return tileFactory.order(z, x, y, orderTimer);
   }
+
+  // Update api
+  api.style = styleDoc;
+  api.create = create;
+  api.redraw = render;
+  api.hideLayer = (id) => setLayerVisibility(id, false);
+  api.showLayer = (id) => setLayerVisibility(id, true);
+  api.sortTasks = tileFactory.sortTasks;
+
+  return api;
 }
 
 export { init };

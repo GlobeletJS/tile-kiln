@@ -8,11 +8,11 @@ export function main() {
     size: 512,
     style: "mapbox://styles/mapbox/streets-v8",
     token: "pk.eyJ1IjoiamhlbWJkIiwiYSI6ImNqcHpueHpyZjBlMjAzeG9kNG9oNzI2NTYifQ.K7fqhk2Z2YZ8NIV94M-5nA", 
-  }).then(setup)
+  }).promise.then(setup)
     .catch(console.log);
 }
 
-function setup(api) {
+function setup(tkapi) {
   // Initialize the display canvas and rendering context
   const canvas = document.getElementById("map");
   canvas.width = canvas.height = 512;
@@ -23,12 +23,12 @@ function setup(api) {
   const coords = { z: 6, x: 14, y: 26 };
 
   // Get first tile, setup map position control
-  var currentTile = api.create(coords.z, coords.x, coords.y, display);
+  var currentTile = tkapi.create(coords.z, coords.x, coords.y, display);
   initMapControl(coords, update);
 
   // Set up toggle for hillshade visibility
   var hillshadeVisible = true;
-  const hillshadeLayers = api.style.layers
+  const hillshadeLayers = tkapi.style.layers
     .filter(layer => layer["source-layer"] === "hillshade")
     .map(layer => layer.id);
   document.getElementById("toggleLines")
@@ -39,7 +39,7 @@ function setup(api) {
 
   // Set up toggle for lines visibility
   var linesVisible = true;
-  const linesLayers = api.style.layers
+  const linesLayers = tkapi.style.layers
     .filter(layer => layer.type === "line")
     .map(layer => layer.id);
   document.getElementById("toggleHillshade")
@@ -50,7 +50,7 @@ function setup(api) {
 
   // Define misc functions
   function update() {
-    currentTile = api.create(coords.z, coords.x, coords.y, display);
+    currentTile = tkapi.create(coords.z, coords.x, coords.y, display);
   }
 
   function display(err, tile) {
@@ -61,11 +61,11 @@ function setup(api) {
 
   function setVisibility(layers, visibility) {
     if (visibility) {
-      layers.forEach(layer => api.showLayer(layer));
+      layers.forEach(layer => tkapi.showLayer(layer));
     } else {
-      layers.forEach(layer => api.hideLayer(layer));
+      layers.forEach(layer => tkapi.hideLayer(layer));
     }
     currentTile.rendered = false;
-    api.redraw(currentTile, display);
+    tkapi.redraw(currentTile, display);
   }
 }

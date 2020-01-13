@@ -9,7 +9,7 @@ export function main() {
     //style: "mapbox://styles/jhembd/cjuon9k8c0c111fn1sdmb2hw0", // Ukiyo-e
     //style: "mapbox://styles/jhembd/cjvr9koqc0a1v1cp73byc4bhj", // Mineral
     token: "pk.eyJ1IjoiamhlbWJkIiwiYSI6ImNqcHpueHpyZjBlMjAzeG9kNG9oNzI2NTYifQ.K7fqhk2Z2YZ8NIV94M-5nA", 
-  }).then(setup)
+  }).promise.then(setup)
     .catch(console.log);
 }
 

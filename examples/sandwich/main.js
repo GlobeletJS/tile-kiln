@@ -10,7 +10,7 @@ export function main() {
     size: 512,
     style: "./wells_style.json",
     token: "pk.eyJ1IjoiamhlbWJkIiwiYSI6ImNqcHpueHpyZjBlMjAzeG9kNG9oNzI2NTYifQ.K7fqhk2Z2YZ8NIV94M-5nA", 
-  }).then(setup)
+  }).promise.then(setup)
     .catch(console.log);
 }
 
