@@ -37,7 +37,7 @@
   "homepage": "https://github.com/globeletjs/tile-kiln#readme",
   "devDependencies": {
     "http-server": "^0.11.1",
-    "rollup": "^1.27.14",
+    "rollup": "^1.29.0",
     "rollup-plugin-commonjs": "^10.1.0",
     "rollup-plugin-json": "^4.0.0",
     "rollup-plugin-node-resolve": "^5.2.0",
@@ -50,8 +50,8 @@
     "pbf": "^3.2.1",
     "plotty": "^0.4.1",
     "rollup-plugin-node-builtins": "^2.1.2",
-    "tile-painter": "^0.1.2",
-    "tile-stencil": "^0.1.4",
+    "tile-painter": "file:../tile-painter",
+    "tile-stencil": "file:../tile-stencil",
     "vector-tile-esm": "^2.1.0",
     "zero-timeout": "0.0.2"
   }

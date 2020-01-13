@@ -12,8 +12,12 @@ export function init(params) {
 
   // Get the style info, then set everything up
   return parseStyle(styleURL, mbToken)
-    .then( style => addPainters(style, canvSize) )
-    .then( style => setup(style, canvSize) );
+    .then( style => { 
+      return addPainters(style, canvSize); 
+    })
+    .then( style => {
+      return setup(style, canvSize) 
+    });
 }
 
 function setup(styleDoc, canvSize) {

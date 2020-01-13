@@ -461,7 +461,6 @@ function autoGetters(properties = {}, defaults) {
 
 function buildStyleFunc(style, defaultVal) {
   var styleFunc, getArg;
-
   if (style === undefined) {
     styleFunc = () => defaultVal;
     styleFunc.type = "constant";
@@ -483,7 +482,6 @@ function buildStyleFunc(style, defaultVal) {
     styleFunc.property = propertyName;
 
   } // NOT IMPLEMENTED: zoom-and-property functions
-
   return styleFunc;
 }
 
@@ -591,6 +589,9 @@ const layoutDefaults = {
   "hillshade": {
     "visibility": "visible",
   },
+  "geotiff": {
+    "visibility": "visible",
+  },
 };
 
 const paintDefaults = {
@@ -686,48 +687,53 @@ const paintDefaults = {
     "hillshade-highlight-color": "#FFFFFF",
     "hillshade-accent-color": "#000000",
   },
+  "geotiff": {
+    "colorbar": "ylgnbu",
+    "colorbar-min": 100,
+    "colorbar-max": 30000,
+    "colorbar-type": "log",
+  },
 };
 
 function parseLayer(inputLayer) {
-  // Make a shallow copy of the layer, to leave the input unchanged
-  const layer = Object.assign({}, inputLayer);
-
-  // Replace filter and rendering properties with functions
-  layer.filter = buildFeatureFilter(layer.filter);
+  // Like getStyleFuncs, but also parses the filter. DEPRECATED
+  const layer = Object.assign({}, inputLayer); // Leave input unchanged
   layer.layout = autoGetters(layer.layout, layoutDefaults[layer.type]);
   layer.paint  = autoGetters(layer.paint,  paintDefaults[layer.type] );
-
+  layer.filter = buildFeatureFilter(layer.filter);
   return layer;
 }
 
 function parseStyle(style, mapboxToken) {
-  // Get a Promise that resolves to a raw Mapbox style document
+  // Like loadStyle, but also parses layers. DEPRECATED
+  
   const getStyleJson = (typeof style === "object")
     ? Promise.resolve(style)                // style is JSON already
     : getJSON( expandStyleURL(style, mapboxToken) ); // Get from URL
 
-  // Set up an asynchronous function to process the document
-  function parseStyleJson(rawStyleDoc) {
-    // Make a shallow copy of the document, to leave the input unchanged
-    const styleDoc = Object.assign({}, rawStyleDoc);
+  return getStyleJson
+    .then( rawStyle => {
+      return Object.assign({}, rawStyle); 
+    }) // Leave input unchanged
+    .then( styleDoc => {
+      return expandLinks(styleDoc, mapboxToken); 
+    })
+    .then( style => { 
+      style.layers = style.layers.map(parseLayer);
+      return style;
+    } );
+}
 
-    // Expand layer references, then parse
-    styleDoc.layers = derefLayers(styleDoc.layers).map(parseLayer);
-
-    // Get linked info for sources and sprites
-    const sourcePromise = expandSources(styleDoc.sources, mapboxToken);
-    const spritePromise = loadSprite(styleDoc.sprite, mapboxToken);
-
-    return Promise.all([sourcePromise, spritePromise])
-      .then( ([sources, spriteData]) => {
-        styleDoc.sources = sources;
-        styleDoc.spriteData = spriteData;
-        return styleDoc;
-      });
-  }
-
-  // Chain together and return
-  return getStyleJson.then( parseStyleJson );
+function expandLinks(styleDoc, mapboxToken) {
+  styleDoc.layers = derefLayers(styleDoc.layers);
+  return Promise.all([
+    expandSources(styleDoc.sources, mapboxToken),
+    loadSprite(styleDoc.sprite, mapboxToken),
+  ]).then( ([sources, spriteData]) => {
+    styleDoc.sources = sources;
+    styleDoc.spriteData = spriteData;
+    return styleDoc;
+  });
 }
 
 function expandSources(rawSources, token) {
@@ -780,6 +786,32 @@ function initRasterFill(layout, paint, canvSize) {
     // be half the size of the vector canvas, so we need 4 of them...
     ctx.drawImage(image, 0, 0, canvSize, canvSize);
   }
+}
+
+function initGeoTiff(layout, paint, canvSize) {
+  return function(ctx, zoom, data) {
+    // paint pixel values onto canvas with Plotty
+    //If colorbar-type=log, compute log of the data, plot on a log scale
+    if (paint["colorbar-type"]() === "log"){
+      var logData=[];
+      for (let i=0; i<data.length; i++){
+        logData[i]=Math.log(data[i]);
+      }
+      var plot = new plotty.plot({
+        canvas: ctx.canvas,
+        data: logData, width: canvSize, height: canvSize,
+        domain: [Math.log(paint["colorbar-min"]()), Math.log(paint["colorbar-max"]())], colorScale: paint["colorbar"]()
+      });
+    }else if (paint["colorbar-type"] === "linear"){
+      var plot = new plotty.plot({
+        canvas: ctx.canvas,
+        data: data, width: canvSize, height: canvSize,
+        domain: [(paint["colorbar-min"]()), (paint["colorbar-max"]())], colorScale: paint["colorbar"]()
+      });
+    }
+    plot.render();
+    return ctx;
+  };
 }
 
 // Adds floating point numbers with twice the normal precision.
@@ -1777,6 +1809,24 @@ function intersects(box1, box2) {
   return true;
 }
 
+function getPainter(style, sprite, canvasSize) {
+  const painter = makePaintFunction(style, sprite, canvasSize);
+
+  return function(context, zoom, data, boundingBoxes) {
+    // Quick exit if there is nothing to see here
+    if (!data) return false;
+    if (style.layout && style.layout["visibility"] === "none") return false;
+    if (style.minzoom !== undefined && zoom < style.minzoom) return false;
+    if (style.maxzoom !== undefined && zoom > style.maxzoom) return false;
+    // Save the initial context state, and restore it after rendering
+    context.save();
+    painter(context, zoom, data, boundingBoxes);
+    context.restore();
+
+    return true; // return value indicates whether canvas has changed
+  };
+}
+
 function makePaintFunction(style, sprite, canvasSize) {
   switch (style.type) {
     case "background":
@@ -1791,6 +1841,8 @@ function makePaintFunction(style, sprite, canvasSize) {
       return initLine(style.layout, style.paint);
     case "fill":
       return initFill(style.layout, style.paint, sprite);
+    case "geotiff":
+      return initGeoTiff(style.layout, style.paint, canvasSize);
     case "fill-extrusion":
     case "heatmap":
     case "hillshade":
@@ -1803,9 +1855,12 @@ function makePaintFunction(style, sprite, canvasSize) {
 function makeDataGetter(style) {
   // Background layers don't need data
   if (style.type === "background") return () => true;
-
+  
   // Store the source name, so we don't re-access the style object every time
   const sourceName = style["source"];
+
+  if (style.type === "geotiff") return (sources) => sources[sourceName];
+
   // Raster layers don't specify a source-layer
   if (style.type === "raster") return (sources) => sources[sourceName];
 
@@ -1830,28 +1885,13 @@ function initPainter(params) {
   const style = params.styleLayer;
   const sprite = params.spriteObject;
   const canvasSize = params.canvasSize || 512;
-
   // Define data prep and rendering functions
   const getData = makeDataGetter(style);
-  const painter = makePaintFunction(style, sprite, canvasSize);
+  const painter = getPainter(style, sprite, canvasSize);
 
   // Compose into one function
   return function(context, zoom, sources, boundingBoxes) {
-    // Quick exits if this layer is not meant to be displayed
-    if (style.layout && style.layout["visibility"] === "none") return false;
-    if (style.minzoom !== undefined && zoom < style.minzoom) return false;
-    if (style.maxzoom !== undefined && zoom > style.maxzoom) return false;
-
-    // Get the data for the layer
-    const data = getData(sources);
-    if (!data) return false;
-
-    // Save the initial context state, and restore it after rendering
-    context.save();
-    painter(context, zoom, data, boundingBoxes);
-    context.restore();
-
-    return true; // true to indicate canvas has changed
+    return painter(context, zoom, getData(sources), boundingBoxes);
   }
 }
 
@@ -16186,7 +16226,7 @@ EventEmitter.init = function() {
   this.domain = null;
   if (EventEmitter.usingDomains) {
     // if there is an active domain, then attach to it.
-    if (domain.active && !(this instanceof domain.Domain)) ;
+    if (domain.active ) ;
   }
 
   if (!this._events || this._events === Object.getPrototypeOf(this)._events) {
@@ -23074,8 +23114,12 @@ function init$1(params) {
 
   // Get the style info, then set everything up
   return parseStyle(styleURL, mbToken)
-    .then( style => addPainters(style, canvSize) )
-    .then( style => setup(style, canvSize) );
+    .then( style => { 
+      return addPainters(style, canvSize); 
+    })
+    .then( style => {
+      return setup(style, canvSize) 
+    });
 }
 
 function setup(styleDoc, canvSize) {
