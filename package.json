@@ -11,10 +11,11 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "npm run build-module && npm run build-examples",
-    "build-module": "rollup -c build/rollup.config.js",
-    "build-examples": "npm run rollup-examples && npm run copy-worker",
+    "build-module": "rollup -c build/rollup.config.js && npm run copy-worker",
+    "copy-worker": "cp node_modules/tile-mixer/dist/worker.bundle.js dist/",
+    "build-examples": "npm run rollup-examples && npm run examples-worker",
     "rollup-examples": "cd examples && rollup -c",
-    "copy-worker": "echo examples/*/ | xargs -n 1 cp node_modules/tile-mixer/dist/worker.bundle.js",
+    "examples-worker": "echo examples/*/ | xargs -n 1 cp dist/worker.bundle.js",
     "postversion": "git push && git push --tags"
   },
   "repository": {
