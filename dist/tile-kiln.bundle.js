@@ -1686,7 +1686,7 @@ function makeDataGetter(style) {
   };
 }
 
-function initRenderer(styleDoc, canvSize, queue) {
+function initRenderer(styleDoc, canvasSize, queue) {
   const spriteObject = styleDoc.spriteData;
 
   // Reverse the order of the symbol layers, for correct collision checking
@@ -1699,7 +1699,7 @@ function initRenderer(styleDoc, canvSize, queue) {
     .map( makeLayerFunc );
 
   function makeLayerFunc(styleLayer) {
-    const paint = initPainter({ styleLayer, spriteObject, canvSize });
+    const paint = initPainter({ styleLayer, spriteObject, canvasSize });
     return { paint, id: styleLayer.id, visible: true };
   }
 
