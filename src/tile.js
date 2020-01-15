@@ -1,10 +1,10 @@
 import { initSources } from "./sources.js";
 
-export function initTileFactory(styleDoc, canvasSize, nThreads) {
+export function initTileFactory(styleDoc, canvasSize, queue, nThreads) {
 
-  const retriever = initSources(styleDoc, nThreads);
+  const getData = initSources(styleDoc, queue, nThreads);
 
-  function order(z, x, y, callback = () => true) {
+  return function order(z, x, y, callback = () => true) {
     let img = document.createElement("canvas");
     img.width = img.height = canvasSize;
 
@@ -18,7 +18,7 @@ export function initTileFactory(styleDoc, canvasSize, nThreads) {
       rendered: false,
     };
 
-    const loadTask = retriever.collect({
+    const loadTask = getData({
       z, x, y,
       getPriority: () => tile.priority,
       callback: addData,
@@ -38,9 +38,4 @@ export function initTileFactory(styleDoc, canvasSize, nThreads) {
 
     return tile;
   }
-
-  return { 
-    order,
-    sortTasks: retriever.sortTasks,
-  };
 }

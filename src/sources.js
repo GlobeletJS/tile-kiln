@@ -1,12 +1,8 @@
 import { initTileMixer } from 'tile-mixer';
 import { initRasterSource } from "./raster.js";
-import { initChunkQueue } from "./queue.js";
 
-export function initSources(styleDoc, numThreads = 4) {
+export function initSources(styleDoc, queue, numThreads = 4) {
   const sources = styleDoc.sources;
-
-  // Initialize queue for main thread scheduling
-  const queue = initChunkQueue();
 
   // Find the number of Worker threads we can use for each vector source
   const nvec = Object.values(sources).filter(s => s.type === "vector").length;
@@ -26,12 +22,7 @@ export function initSources(styleDoc, numThreads = 4) {
     getters[key] = initTileMixer({ threads, source, layers, queue });
   });
 
-  return {
-    sortTasks: queue.sortTasks,
-    collect,
-  };
-
-  function collect({ z, x, y, getPriority, callback }) {
+  return function collectSources({ z, x, y, getPriority, callback }) {
     // Collect data from all soures into one object
     const dataCollection = {};
     const loadTasks = {};
