@@ -1317,6 +1317,556 @@ function initRasterFill(layout, paint, canvSize) {
   }
 }
 
+// Adds floating point numbers with twice the normal precision.
+// Reference: J. R. Shewchuk, Adaptive Precision Floating-Point Arithmetic and
+// Fast Robust Geometric Predicates, Discrete & Computational Geometry 18(3)
+// 305–363 (1997).
+// Code adapted from GeographicLib by Charles F. F. Karney,
+// http://geographiclib.sourceforge.net/
+
+function adder() {
+  return new Adder;
+}
+
+function Adder() {
+  this.reset();
+}
+
+Adder.prototype = {
+  constructor: Adder,
+  reset: function() {
+    this.s = // rounded value
+    this.t = 0; // exact error
+  },
+  add: function(y) {
+    add(temp, y, this.t);
+    add(this, temp.s, this.s);
+    if (this.s) this.t += temp.t;
+    else this.s = temp.t;
+  },
+  valueOf: function() {
+    return this.s;
+  }
+};
+
+var temp = new Adder;
+
+function add(adder, a, b) {
+  var x = adder.s = a + b,
+      bv = x - a,
+      av = x - bv;
+  adder.t = (a - av) + (b - bv);
+}
+
+var pi = Math.PI;
+var tau = pi * 2;
+
+var abs = Math.abs;
+var sqrt = Math.sqrt;
+
+function noop() {}
+
+function streamGeometry(geometry, stream) {
+  if (geometry && streamGeometryType.hasOwnProperty(geometry.type)) {
+    streamGeometryType[geometry.type](geometry, stream);
+  }
+}
+
+var streamObjectType = {
+  Feature: function(object, stream) {
+    streamGeometry(object.geometry, stream);
+  },
+  FeatureCollection: function(object, stream) {
+    var features = object.features, i = -1, n = features.length;
+    while (++i < n) streamGeometry(features[i].geometry, stream);
+  }
+};
+
+var streamGeometryType = {
+  Sphere: function(object, stream) {
+    stream.sphere();
+  },
+  Point: function(object, stream) {
+    object = object.coordinates;
+    stream.point(object[0], object[1], object[2]);
+  },
+  MultiPoint: function(object, stream) {
+    var coordinates = object.coordinates, i = -1, n = coordinates.length;
+    while (++i < n) object = coordinates[i], stream.point(object[0], object[1], object[2]);
+  },
+  LineString: function(object, stream) {
+    streamLine(object.coordinates, stream, 0);
+  },
+  MultiLineString: function(object, stream) {
+    var coordinates = object.coordinates, i = -1, n = coordinates.length;
+    while (++i < n) streamLine(coordinates[i], stream, 0);
+  },
+  Polygon: function(object, stream) {
+    streamPolygon(object.coordinates, stream);
+  },
+  MultiPolygon: function(object, stream) {
+    var coordinates = object.coordinates, i = -1, n = coordinates.length;
+    while (++i < n) streamPolygon(coordinates[i], stream);
+  },
+  GeometryCollection: function(object, stream) {
+    var geometries = object.geometries, i = -1, n = geometries.length;
+    while (++i < n) streamGeometry(geometries[i], stream);
+  }
+};
+
+function streamLine(coordinates, stream, closed) {
+  var i = -1, n = coordinates.length - closed, coordinate;
+  stream.lineStart();
+  while (++i < n) coordinate = coordinates[i], stream.point(coordinate[0], coordinate[1], coordinate[2]);
+  stream.lineEnd();
+}
+
+function streamPolygon(coordinates, stream) {
+  var i = -1, n = coordinates.length;
+  stream.polygonStart();
+  while (++i < n) streamLine(coordinates[i], stream, 1);
+  stream.polygonEnd();
+}
+
+function geoStream(object, stream) {
+  if (object && streamObjectType.hasOwnProperty(object.type)) {
+    streamObjectType[object.type](object, stream);
+  } else {
+    streamGeometry(object, stream);
+  }
+}
+
+function identity(x) {
+  return x;
+}
+
+var areaSum = adder(),
+    areaRingSum = adder(),
+    x00,
+    y00,
+    x0,
+    y0;
+
+var areaStream = {
+  point: noop,
+  lineStart: noop,
+  lineEnd: noop,
+  polygonStart: function() {
+    areaStream.lineStart = areaRingStart;
+    areaStream.lineEnd = areaRingEnd;
+  },
+  polygonEnd: function() {
+    areaStream.lineStart = areaStream.lineEnd = areaStream.point = noop;
+    areaSum.add(abs(areaRingSum));
+    areaRingSum.reset();
+  },
+  result: function() {
+    var area = areaSum / 2;
+    areaSum.reset();
+    return area;
+  }
+};
+
+function areaRingStart() {
+  areaStream.point = areaPointFirst;
+}
+
+function areaPointFirst(x, y) {
+  areaStream.point = areaPoint;
+  x00 = x0 = x, y00 = y0 = y;
+}
+
+function areaPoint(x, y) {
+  areaRingSum.add(y0 * x - x0 * y);
+  x0 = x, y0 = y;
+}
+
+function areaRingEnd() {
+  areaPoint(x00, y00);
+}
+
+var x0$1 = Infinity,
+    y0$1 = x0$1,
+    x1 = -x0$1,
+    y1 = x1;
+
+var boundsStream = {
+  point: boundsPoint,
+  lineStart: noop,
+  lineEnd: noop,
+  polygonStart: noop,
+  polygonEnd: noop,
+  result: function() {
+    var bounds = [[x0$1, y0$1], [x1, y1]];
+    x1 = y1 = -(y0$1 = x0$1 = Infinity);
+    return bounds;
+  }
+};
+
+function boundsPoint(x, y) {
+  if (x < x0$1) x0$1 = x;
+  if (x > x1) x1 = x;
+  if (y < y0$1) y0$1 = y;
+  if (y > y1) y1 = y;
+}
+
+// TODO Enforce positive area for exterior, negative area for interior?
+
+var X0 = 0,
+    Y0 = 0,
+    Z0 = 0,
+    X1 = 0,
+    Y1 = 0,
+    Z1 = 0,
+    X2 = 0,
+    Y2 = 0,
+    Z2 = 0,
+    x00$1,
+    y00$1,
+    x0$2,
+    y0$2;
+
+var centroidStream = {
+  point: centroidPoint,
+  lineStart: centroidLineStart,
+  lineEnd: centroidLineEnd,
+  polygonStart: function() {
+    centroidStream.lineStart = centroidRingStart;
+    centroidStream.lineEnd = centroidRingEnd;
+  },
+  polygonEnd: function() {
+    centroidStream.point = centroidPoint;
+    centroidStream.lineStart = centroidLineStart;
+    centroidStream.lineEnd = centroidLineEnd;
+  },
+  result: function() {
+    var centroid = Z2 ? [X2 / Z2, Y2 / Z2]
+        : Z1 ? [X1 / Z1, Y1 / Z1]
+        : Z0 ? [X0 / Z0, Y0 / Z0]
+        : [NaN, NaN];
+    X0 = Y0 = Z0 =
+    X1 = Y1 = Z1 =
+    X2 = Y2 = Z2 = 0;
+    return centroid;
+  }
+};
+
+function centroidPoint(x, y) {
+  X0 += x;
+  Y0 += y;
+  ++Z0;
+}
+
+function centroidLineStart() {
+  centroidStream.point = centroidPointFirstLine;
+}
+
+function centroidPointFirstLine(x, y) {
+  centroidStream.point = centroidPointLine;
+  centroidPoint(x0$2 = x, y0$2 = y);
+}
+
+function centroidPointLine(x, y) {
+  var dx = x - x0$2, dy = y - y0$2, z = sqrt(dx * dx + dy * dy);
+  X1 += z * (x0$2 + x) / 2;
+  Y1 += z * (y0$2 + y) / 2;
+  Z1 += z;
+  centroidPoint(x0$2 = x, y0$2 = y);
+}
+
+function centroidLineEnd() {
+  centroidStream.point = centroidPoint;
+}
+
+function centroidRingStart() {
+  centroidStream.point = centroidPointFirstRing;
+}
+
+function centroidRingEnd() {
+  centroidPointRing(x00$1, y00$1);
+}
+
+function centroidPointFirstRing(x, y) {
+  centroidStream.point = centroidPointRing;
+  centroidPoint(x00$1 = x0$2 = x, y00$1 = y0$2 = y);
+}
+
+function centroidPointRing(x, y) {
+  var dx = x - x0$2,
+      dy = y - y0$2,
+      z = sqrt(dx * dx + dy * dy);
+
+  X1 += z * (x0$2 + x) / 2;
+  Y1 += z * (y0$2 + y) / 2;
+  Z1 += z;
+
+  z = y0$2 * x - x0$2 * y;
+  X2 += z * (x0$2 + x);
+  Y2 += z * (y0$2 + y);
+  Z2 += z * 3;
+  centroidPoint(x0$2 = x, y0$2 = y);
+}
+
+function PathContext(context) {
+  this._context = context;
+}
+
+PathContext.prototype = {
+  _radius: 4.5,
+  pointRadius: function(_) {
+    return this._radius = _, this;
+  },
+  polygonStart: function() {
+    this._line = 0;
+  },
+  polygonEnd: function() {
+    this._line = NaN;
+  },
+  lineStart: function() {
+    this._point = 0;
+  },
+  lineEnd: function() {
+    if (this._line === 0) this._context.closePath();
+    this._point = NaN;
+  },
+  point: function(x, y) {
+    switch (this._point) {
+      case 0: {
+        this._context.moveTo(x, y);
+        this._point = 1;
+        break;
+      }
+      case 1: {
+        this._context.lineTo(x, y);
+        break;
+      }
+      default: {
+        this._context.moveTo(x + this._radius, y);
+        this._context.arc(x, y, this._radius, 0, tau);
+        break;
+      }
+    }
+  },
+  result: noop
+};
+
+var lengthSum = adder(),
+    lengthRing,
+    x00$2,
+    y00$2,
+    x0$3,
+    y0$3;
+
+var lengthStream = {
+  point: noop,
+  lineStart: function() {
+    lengthStream.point = lengthPointFirst;
+  },
+  lineEnd: function() {
+    if (lengthRing) lengthPoint(x00$2, y00$2);
+    lengthStream.point = noop;
+  },
+  polygonStart: function() {
+    lengthRing = true;
+  },
+  polygonEnd: function() {
+    lengthRing = null;
+  },
+  result: function() {
+    var length = +lengthSum;
+    lengthSum.reset();
+    return length;
+  }
+};
+
+function lengthPointFirst(x, y) {
+  lengthStream.point = lengthPoint;
+  x00$2 = x0$3 = x, y00$2 = y0$3 = y;
+}
+
+function lengthPoint(x, y) {
+  x0$3 -= x, y0$3 -= y;
+  lengthSum.add(sqrt(x0$3 * x0$3 + y0$3 * y0$3));
+  x0$3 = x, y0$3 = y;
+}
+
+function PathString() {
+  this._string = [];
+}
+
+PathString.prototype = {
+  _radius: 4.5,
+  _circle: circle(4.5),
+  pointRadius: function(_) {
+    if ((_ = +_) !== this._radius) this._radius = _, this._circle = null;
+    return this;
+  },
+  polygonStart: function() {
+    this._line = 0;
+  },
+  polygonEnd: function() {
+    this._line = NaN;
+  },
+  lineStart: function() {
+    this._point = 0;
+  },
+  lineEnd: function() {
+    if (this._line === 0) this._string.push("Z");
+    this._point = NaN;
+  },
+  point: function(x, y) {
+    switch (this._point) {
+      case 0: {
+        this._string.push("M", x, ",", y);
+        this._point = 1;
+        break;
+      }
+      case 1: {
+        this._string.push("L", x, ",", y);
+        break;
+      }
+      default: {
+        if (this._circle == null) this._circle = circle(this._radius);
+        this._string.push("M", x, ",", y, this._circle);
+        break;
+      }
+    }
+  },
+  result: function() {
+    if (this._string.length) {
+      var result = this._string.join("");
+      this._string = [];
+      return result;
+    } else {
+      return null;
+    }
+  }
+};
+
+function circle(radius) {
+  return "m0," + radius
+      + "a" + radius + "," + radius + " 0 1,1 0," + -2 * radius
+      + "a" + radius + "," + radius + " 0 1,1 0," + 2 * radius
+      + "z";
+}
+
+function index(projection, context) {
+  var pointRadius = 4.5,
+      projectionStream,
+      contextStream;
+
+  function path(object) {
+    if (object) {
+      if (typeof pointRadius === "function") contextStream.pointRadius(+pointRadius.apply(this, arguments));
+      geoStream(object, projectionStream(contextStream));
+    }
+    return contextStream.result();
+  }
+
+  path.area = function(object) {
+    geoStream(object, projectionStream(areaStream));
+    return areaStream.result();
+  };
+
+  path.measure = function(object) {
+    geoStream(object, projectionStream(lengthStream));
+    return lengthStream.result();
+  };
+
+  path.bounds = function(object) {
+    geoStream(object, projectionStream(boundsStream));
+    return boundsStream.result();
+  };
+
+  path.centroid = function(object) {
+    geoStream(object, projectionStream(centroidStream));
+    return centroidStream.result();
+  };
+
+  path.projection = function(_) {
+    return arguments.length ? (projectionStream = _ == null ? (projection = null, identity) : (projection = _).stream, path) : projection;
+  };
+
+  path.context = function(_) {
+    if (!arguments.length) return context;
+    contextStream = _ == null ? (context = null, new PathString) : new PathContext(context = _);
+    if (typeof pointRadius !== "function") contextStream.pointRadius(pointRadius);
+    return path;
+  };
+
+  path.pointRadius = function(_) {
+    if (!arguments.length) return pointRadius;
+    pointRadius = typeof _ === "function" ? _ : (contextStream.pointRadius(+_), +_);
+    return path;
+  };
+
+  return path.projection(projection).context(context);
+}
+
+function initBrush({ setters, methods }) {
+  const dataFuncs = setters.filter(s => s.getStyle.type === "property");
+  const zoomFuncs = setters.filter(s => s.getStyle.type !== "property");
+
+  // Choose draw function based on whether styles are data-dependent
+  const draw = (dataFuncs.length > 0)
+    ? dataDependentDraw
+    : constantDraw;
+
+  return function(ctx, zoom, data) {
+    const path = index(null, ctx);
+
+    // Set the non-data-dependent state
+    zoomFuncs.forEach(f => f.setState(f.getStyle(zoom), ctx, path));
+
+    // Draw everything and return
+    return draw(ctx, path, zoom, data);
+  }
+
+  function dataDependentDraw(ctx, path, zoom, data) {
+    const features = addStylesToFeatures(dataFuncs, zoom, data);
+
+    // Draw features, updating canvas state as data-dependent styles change
+    let numFeatures = features.length;
+    let i = 0;
+    while (i < numFeatures) {
+      // Set state based on the styles of the current feature
+      let styles = features[i].styles;
+      dataFuncs.forEach( (f, j) => f.setState(styles[j], ctx, path) );
+
+      ctx.beginPath();
+      // Add features to the path, until the styles change
+      let id = features[i].styleID;
+      while (i < numFeatures && features[i].styleID === id) {
+        path(features[i]);
+        i++;
+      }
+
+      // Render the current path
+      methods.forEach(method => ctx[method]());
+    }
+  }
+
+  function constantDraw(ctx, path, zoom, data) {
+    // Draw all the data with the current canvas state
+    ctx.beginPath();
+    path(data);
+    methods.forEach(method => ctx[method]());
+  }
+}
+
+function addStylesToFeatures(propFuncs, zoom, data) {
+  // Build an array of features, adding style values and a sortable id
+  // WARNING: modifies the features in the original data object!
+  let styledFeatures = data.features.map(feature => {
+    feature.styles = propFuncs.map(f => f.getStyle(zoom, feature));
+    feature.styleID = feature.styles.join("|");
+    return feature;
+  });
+
+  // Sort the array, to collect features with the same styling
+  return styledFeatures.sort( (a, b) => (a.styleID < b.styleID) ? -1 : 1 );
+}
+
 function canv(property) {
   // Create a default state setter for a Canvas 2D renderer
   return (val, ctx) => { ctx[property] = val; };
@@ -1325,27 +1875,6 @@ function canv(property) {
 function pair(getStyle, setState) {
   // Return a style value getter and a renderer state setter as a paired object
   return { getStyle, setState };
-}
-
-function initBrush({ setters, methods }) {
-  const dataFuncs = setters.filter(s => s.getStyle.type === "property");
-  const zoomFuncs = setters.filter(s => s.getStyle.type !== "property");
-
-  return function(ctx, zoom, data) {
-    // Set the non-data-dependent context state
-    zoomFuncs.forEach(f => f.setState(f.getStyle(zoom), ctx));
-
-    // Loop over features and draw
-    data.compressed.forEach(feature => drawFeature(ctx, zoom, feature));
-  }
-
-  function drawFeature(ctx, zoom, feature) {
-    // Set data-dependent context state
-    dataFuncs.forEach(f => f.setState(f.getStyle(zoom, feature), ctx));
-
-    // Draw path
-    methods.forEach(method => ctx[method](feature.path));
-  }
 }
 
 function makePatternSetter(sprite) {
@@ -1370,15 +1899,18 @@ function makePatternSetter(sprite) {
   };
 }
 
+// Renders discrete lines, points, polygons... like painting with a brush
+
 function initCircle(layout, paint) {
-  const setRadius = (radius, ctx) => ctx.lineWidth = radius * 2;
+  const setRadius = (radius, ctx, path) => {
+    if (radius) path.pointRadius(radius);
+  };
   const setters = [
     pair(paint["circle-radius"],  setRadius),
-    pair(paint["circle-color"],   canv("strokeStyle")),
+    pair(paint["circle-color"],   canv("fillStyle")),
     pair(paint["circle-opacity"], canv("globalAlpha")),
-    pair(() => "round",           canv("lineCap")),
   ];
-  const methods = ["stroke"];
+  const methods = ["fill"];
 
   return initBrush({ setters, methods });
 }
@@ -1396,19 +1928,9 @@ function initLine(layout, paint) {
     // line-gap-width, 
     // line-translate, line-translate-anchor,
     // line-offset, line-blur, line-gradient, line-pattern, 
+    // line-dasharray
   ];
-
-  let dasharray = paint["line-dasharray"];
-  if (dasharray.type !== "constant" || dasharray() !== undefined) {
-    const getWidth = paint["line-width"];
-    const getDash = (zoom, feature) => {
-      let width = getWidth(zoom, feature);
-      let dashes = dasharray(zoom, feature);
-      return dashes.map(d => d * width);
-    };
-    const setDash = (dash, ctx) => ctx.setLineDash(dash);
-    setters.push( pair(getDash, setDash) );
-  }  const methods = ["stroke"];
+  const methods = ["stroke"];
 
   return initBrush({ setters, methods });
 }
@@ -1430,7 +1952,7 @@ function initFill(layout, paint, sprite) {
   const setters = [
     pair(getStyle, setState),
     pair(paint["fill-opacity"],   canv("globalAlpha")),
-    pair(paint["fill-translate"], (t, ctx) => ctx.translate(t[0], t[1])),
+    // fill-translate, 
     // fill-translate-anchor,
   ];
   const methods = ["fill"];
@@ -1445,6 +1967,169 @@ function initFill(layout, paint, sprite) {
   }
 
   return initBrush({ setters, methods });
+}
+
+function getTokenParser(tokenText) {
+  if (!tokenText) return () => undefined;
+  const tokenPattern = /{([^{}]+)}/g;
+
+  // We break tokenText into pieces that are either plain text or tokens,
+  // then construct an array of functions to parse each piece
+  var tokenFuncs = [];
+  var charIndex  = 0;
+  while (charIndex < tokenText.length) {
+    // Find the next token
+    let result = tokenPattern.exec(tokenText);
+
+    if (!result) {
+      // No tokens left. Parse the plain text after the last token
+      let str = tokenText.substring(charIndex);
+      tokenFuncs.push(props => str);
+      break;
+    } else if (result.index > charIndex) {
+      // There is some plain text before the token
+      let str = tokenText.substring(charIndex, result.index);
+      tokenFuncs.push(props => str);
+    }
+
+    // Add a function to process the current token
+    let token = result[1];
+    tokenFuncs.push(props => props[token]);
+    charIndex = tokenPattern.lastIndex;
+  }
+  
+  // We now have an array of functions returning either a text string or
+  // a feature property
+  // Return a function that assembles everything
+  return function(properties) {
+    return tokenFuncs.reduce(concat, "");
+    function concat(str, tokenFunc) {
+      let text = tokenFunc(properties) || "";
+      return str += text;
+    }
+  };
+}
+
+// https://developer.mozilla.org/en-US/docs/Web/CSS/font-weight#Common_weight_name_mapping
+// Some obscure names from https://css3-tutorial.net/text-font/font-weight/
+// But the 2 sources conflict!! The mapping is not standardized!
+const fontWeights = {
+  "thin": 100,
+  "hairline": 100,
+  "extra-light": 200,
+  "ultra-light": 200,
+  "light": 300,
+  "book": 300,
+  "regular": 400,
+  "normal": 400,
+  "plain": 400,
+  "roman": 400,
+  "standard": 400,
+  "medium": 500,
+  "semi-bold": 600,
+  "demi-bold": 600,
+  "bold": 700,
+  "extra-bold": 800,
+  "ultra-bold": 800,
+  "heavy": 900,
+  "black": 900,
+  "fat": 900,
+  "poster": 900,
+  "ultra-black": 950,
+  "extra-black": 950,
+  "heavy-black": 950,
+};
+const wNames = Object.keys(fontWeights);
+
+function popFontWeight(words, defaultWeight) {
+  // Input words is an array of words from a font descriptor string, 
+  // where the last word (or two) may contain font-weight info. 
+  // Returns a numeric font-weight (if found), or defaultWeight
+  // NOTES
+  //  - ASSUMES font-style info (italics) has already been removed.
+  //  - Input words array may be shortened!
+
+  // If the last word is already a numeric weight, just remove and return it
+  if (typeof words.slice(-1)[0] === "number") return words.pop();
+
+  // Check if the last word matches one of the weight names in the dictionary
+  var test = words.slice(-1)[0].toLowerCase();
+  let wName = wNames.find(w => w == test || w.replace("-", "") == test);
+  if (wName) {
+    words.pop();
+    return fontWeights[wName];
+  }
+
+  // Try again with the last 2 words
+  test = words.slice(-2).join(" ").toLowerCase();
+  wName = wNames.find(w => w.replace("-", " ") == test);
+  if (wName) {
+    words.pop();
+    words.pop();
+  }
+  return fontWeights[wName] || defaultWeight;
+}
+
+const italicRE = /(italic|oblique)$/i;
+const fontCache = {};
+
+function getFontString(fonts, size, lineHeight) {
+  // TODO: Need to pre-load all needed fonts, using FontFace API
+  if (!Array.isArray(fonts)) fonts = [fonts];
+
+  // Check if we already calculated the CSS for this font
+  var cssData = fontCache[fonts.join(",")];
+  if (cssData) return combine(cssData, size, lineHeight);
+
+  var weight = 400;
+  var style = 'normal';
+  var fontFamilies = [];
+  fonts.forEach(font => {
+    var parts = font.split(' ');
+
+    // Get font-style from end of string
+    var maybeStyle = parts[parts.length - 1].toLowerCase();
+    if (["normal", "italic", "oblique"].includes(maybeStyle)) {
+      style = maybeStyle;
+      parts.pop();
+    } else if (italicRE.test(maybeStyle)) {
+      // Style is part of the last word. Separate the parts
+      // NOTE: haven't seen an example of this?
+      // Idea from the mapbox-to-css module on NPM
+      style = italicRE.exec(maybeStyle)[0];
+      parts[parts.length - 1].replace(italicRE, '');
+    }
+
+    // Get font-weight
+    weight = popFontWeight(parts, weight);
+
+    // Get font-family
+    // Special handling for Noto Sans, from mapbox-to-css module on NPM
+    var fontFamily = parts.join(" ")
+      .replace('Klokantech Noto Sans', 'Noto Sans');
+    if (fontFamily.indexOf(" ") !== -1) { // Multi-word string. Wrap it in quotes
+      fontFamily = '"' + fontFamily + '"';
+    }
+    fontFamilies.push(fontFamily);
+  });
+
+  fontFamilies.push("sans-serif"); // Last resort fallback
+
+  // CSS font property: font-style font-weight font-size/line-height font-family
+  cssData = fontCache[fonts.join(",")] = [style, weight, fontFamilies];
+
+  return combine(cssData, size, lineHeight);
+}
+function combine(cssData, size, lineHeight) {
+  // Round fontSize to the nearest 0.1 pixel
+  size = Math.round(10.0 * size) * 0.1;
+
+  // Combine with line height
+  let sizes = (lineHeight) 
+    ? size + "px/" + lineHeight 
+    : size + "px";
+
+  return [cssData[0], cssData[1], sizes, cssData[2]].join(" ");
 }
 
 function getTextShift(anchor) {
@@ -1475,15 +2160,34 @@ function getTextShift(anchor) {
   }
 }
 
+function getTextTransform(code) {
+  switch (code) {
+    case "uppercase":
+      return f => f.toUpperCase();
+    case "lowercase":
+      return f => f.toLowerCase();
+    case "none":
+    default:
+      return f => f;
+  }
+}
+
 function initTextLabeler(ctx, zoom, layout, paint) {
+  const textParser = getTokenParser( layout["text-field"](zoom) );
+
   const fontSize = layout["text-size"](zoom);
+  const fontFace = layout["text-font"](zoom);
   const lineHeight = layout["text-line-height"](zoom);
+  ctx.font = getFontString(fontFace, fontSize, lineHeight);
+
   const textPadding = layout["text-padding"](zoom);
   const textOffset = layout["text-offset"](zoom);
 
   ctx.textBaseline = "bottom";
   ctx.textAlign = "left";
   const posShift = getTextShift( layout["text-anchor"](zoom) );
+
+  const transform = getTextTransform( layout["text-transform"](zoom) );
 
   const haloWidth = paint["text-halo-width"](zoom);
   if (haloWidth > 0) {
@@ -1498,16 +2202,17 @@ function initTextLabeler(ctx, zoom, layout, paint) {
   return { measure, draw };
 
   function measure(feature) {
-    labelText = feature.properties.labelText;
+    labelText = textParser(feature.properties);
     if (!labelText) return;
 
-    labelLength = feature.properties.textWidth;
+    labelText = transform(labelText);
+    labelLength = ctx.measureText(labelText).width;
     labelHeight = fontSize * lineHeight;
 
-    // Compute coordinates of bottom left corner of text
     var coords = feature.geometry.coordinates;
-    x = coords[0] + posShift[0] * labelLength + textOffset[0] * fontSize;
-    y = coords[1] + posShift[1] * labelHeight + textOffset[1] * labelHeight;
+    // Compute coordinates of bottom left corner of text
+    x = coords[0] + textOffset[0] * fontSize + posShift[0] * labelLength;
+    y = coords[1] + textOffset[1] * labelHeight + posShift[1] * labelHeight;
 
     // Return a bounding box object
     return [
@@ -1525,6 +2230,7 @@ function initTextLabeler(ctx, zoom, layout, paint) {
 }
 
 function initIconLabeler(ctx, zoom, layout, paint, sprite) {
+  const getSpriteID = getTokenParser( layout["icon-image"](zoom) );
   const iconPadding = layout["icon-padding"](zoom);
 
   var spriteID, spriteMeta, x, y;
@@ -1532,7 +2238,7 @@ function initIconLabeler(ctx, zoom, layout, paint, sprite) {
   return { measure, draw };
 
   function measure(feature) {
-    spriteID = feature.properties.spriteID;
+    spriteID = getSpriteID(feature.properties);
     if (!spriteID) return;
 
     spriteMeta = sprite.meta[spriteID];
@@ -1564,18 +2270,15 @@ function initIconLabeler(ctx, zoom, layout, paint, sprite) {
   }
 }
 
-function initLabeler(layout, paint, sprite, canvasSize) {
+function initLabeler(layout, paint, sprite) {
   // Skip unsupported symbol types
   if (layout["symbol-placement"]() === "line") return () => undefined;
 
-  const tileBox = [[0, 0], [canvasSize, canvasSize]];
-
   return function(ctx, zoom, data, boxes) {
-    ctx.font = data.properties.font;
     const textLabeler = initTextLabeler(ctx, zoom, layout, paint);
     const iconLabeler = initIconLabeler(ctx, zoom, layout, paint, sprite);
 
-    data.compressed.forEach(drawLabel);
+    data.features.forEach(drawLabel);
 
     function drawLabel(feature) {
       var textBox = textLabeler.measure(feature);
@@ -1584,15 +2287,12 @@ function initLabeler(layout, paint, sprite, canvasSize) {
       var iconBox = iconLabeler.measure(feature);
       if ( collides(iconBox) ) return;
 
-      // Draw the labels, IF they are inside the tile
-      if ( iconBox && intersects(tileBox, iconBox) ) {
-        iconLabeler.draw();
-        boxes.push(iconBox);
-      }
-      if ( textBox && intersects(tileBox, textBox) ) {
-        textLabeler.draw();
-        boxes.push(textBox);
-      }
+      if (textBox) boxes.push(textBox);
+      if (iconBox) boxes.push(iconBox);
+
+      // Draw the labels
+      iconLabeler.draw();
+      textLabeler.draw();
     }
 
     function collides(newBox) {
@@ -1612,22 +2312,6 @@ function intersects(box1, box2) {
   return true;
 }
 
-function getPainter(style, sprite, canvasSize) {
-  const painter = makePaintFunction(style, sprite, canvasSize);
-
-  return function(context, zoom, data, boundingBoxes) {
-    if (!data) return false;
-    if (style.layout.visibility() === "none") return false;
-
-    // Save the initial context state, and restore it after rendering
-    context.save();
-    painter(context, zoom, data, boundingBoxes);
-    context.restore();
-
-    return true; // return value indicates whether canvas has changed
-  };
-}
-
 function makePaintFunction(style, sprite, canvasSize) {
   switch (style.type) {
     case "background":
@@ -1635,7 +2319,7 @@ function makePaintFunction(style, sprite, canvasSize) {
     case "raster":
       return initRasterFill(style.layout, style.paint, canvasSize);
     case "symbol":
-      return initLabeler(style.layout, style.paint, sprite, canvasSize);
+      return initLabeler(style.layout, style.paint, sprite);
     case "circle":
       return initCircle(style.layout, style.paint);
     case "line":
@@ -1651,39 +2335,59 @@ function makePaintFunction(style, sprite, canvasSize) {
   }
 }
 
-function initPainter(params) {
-  const style = params.styleLayer;
-  const canvasSize = params.canvasSize || 512;
-  const paint = getPainter(style, params.spriteObject, canvasSize);
-
-  // Define data getter
-  const sourceName = style["source"];
-  const getData = makeDataGetter(style);
-
-  // Compose data getter and painter into one function
-  return function(context, zoom, sources, boundingBoxes) {
-    let data = getData(sources[sourceName], zoom);
-    return paint(context, zoom, data, boundingBoxes);
-  }
-}
-
 function makeDataGetter(style) {
   // Background layers don't need data
   if (style.type === "background") return () => true;
 
-  const minzoom = style.minzoom || 0;
-  const maxzoom = style.maxzoom || 99; // NOTE: doesn't allow maxzoom = 0
+  // Store the source name, so we don't re-access the style object every time
+  const sourceName = style["source"];
+  // Raster layers don't specify a source-layer
+  if (style.type === "raster") return (sources) => sources[sourceName];
 
-  // Raster layers don't need any data processing
-  if (style.type === "raster") return function(source, zoom) {
-    if (zoom < minzoom || maxzoom < zoom) return false;
-    return source;
-  }
+  const layerName = style["source-layer"];
+  const filter = style.filter;
 
-  return function(source, zoom) {
-    if (zoom < minzoom || maxzoom < zoom) return false;
-    if (source) return source[style.id];
+  return function(sources) {
+    let source = sources[sourceName];
+    if (!source) return false;
+
+    let layer = source[layerName];
+    if (!layer) return false;
+
+    let features = layer.features.filter(filter);
+    if (features.length < 1) return false;
+
+    return { type: "FeatureCollection", features: features };
   };
+}
+
+function initPainter(params) {
+  const style = params.styleLayer;
+  const sprite = params.spriteObject;
+  const canvasSize = params.canvasSize || 512;
+
+  // Define data prep and rendering functions
+  const getData = makeDataGetter(style);
+  const painter = makePaintFunction(style, sprite, canvasSize);
+
+  // Compose into one function
+  return function(context, zoom, sources, boundingBoxes) {
+    // Quick exits if this layer is not meant to be displayed
+    if (style.layout && style.layout["visibility"] === "none") return false;
+    if (style.minzoom !== undefined && zoom < style.minzoom) return false;
+    if (style.maxzoom !== undefined && zoom > style.maxzoom) return false;
+
+    // Get the data for the layer
+    const data = getData(sources);
+    if (!data) return false;
+
+    // Save the initial context state, and restore it after rendering
+    context.save();
+    painter(context, zoom, data, boundingBoxes);
+    context.restore();
+
+    return true; // true to indicate canvas has changed
+  }
 }
 
 function initRenderer(styleDoc, canvasSize, queue) {
