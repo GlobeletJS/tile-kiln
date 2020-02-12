@@ -42,13 +42,17 @@
     "rollup-plugin-commonjs": "^10.1.0",
     "rollup-plugin-json": "^4.0.0",
     "rollup-plugin-node-resolve": "^5.2.0",
+    "rollup-plugin-node-builtins": "^2.1.2",
+    "babel-runtime": "^6.26.0",
     "touch-sampler": "0.0.1"
   },
   "dependencies": {
     "pbf": "^3.2.1",
+    "plotty": "^0.4.1",
+    "geotiff": "^1.0.0-beta.6",
     "tile-mixer": "github:GlobeletJS/tile-mixer",
-    "tile-painter": "^0.1.2",
-    "tile-stencil": "^0.2.0",
+    "tile-painter": "github:GlobeletJS/tile-painter#paths-geotiff",
+    "tile-stencil": "github:GlobeletJS/tile-stencil#geotiff",
     "vector-tile-esm": "^2.1.0",
     "zero-timeout": "0.0.2"
   }

@@ -1,0 +1,37 @@
+{
+  "version": 8,
+  "name": "Mapbox Light",
+  "metadata": {
+    "mapbox:autocomposite": true,
+    "mapbox:type": "default",
+    "mapbox:origin": "light-v9"
+  },
+  "sources": {
+    "bedrock": {
+      "type": "geotiff",
+      "tiles": [
+        "https://s3.amazonaws.com/cogs.earthpeel.com/gdaltiles_1km_v8/{z}/BDTICM_M_1km_ll_srs3857c_{x}_{y}.tif"
+      ],
+      "tileSize": 512,
+      "maxzoom": 6
+    }
+  },
+  "sprite": "",
+  "glyphs": "",
+  "visibility": "public",
+  "layers": [
+    { "id": "bedrock",
+      "type": "geotiff",
+      "source": "bedrock",
+      "layout": {
+        "visibility":"visible"
+      },
+      "paint": {
+        "colorbar": "ylgnbu",
+        "colorbar-min": 100,
+        "colorbar-max": 30000,
+        "colorbar-type": "log"
+      }
+    }
+  ]
+}

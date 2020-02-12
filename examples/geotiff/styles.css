@@ -1,0 +1,30 @@
+* {
+  box-sizing: border-box;
+}
+html {
+  overflow: hidden;
+  height: 100%;
+}
+body {
+  height: 100%;
+  border: 0;
+  margin: 0;
+  touch-action: none;
+  overscroll-behavior: none;
+}
+#map {
+  width: 512px;
+  height: 512px;
+  background-color: #FF0000;
+  display: inline-block;
+  position: relative;
+}
+.display-canvas {
+  background-color: #FFFFFF;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+}

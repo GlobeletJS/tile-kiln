@@ -1,5 +1,6 @@
 import { initTileMixer } from 'tile-mixer';
 import { initRasterSource } from "./raster.js";
+import { initGeotiffSource } from "./geotiff.js";
 
 export function initSources(styleDoc, queue, numThreads = 4) {
   const sources = styleDoc.sources;
@@ -15,6 +16,8 @@ export function initSources(styleDoc, queue, numThreads = 4) {
 
     if (source.type === "raster") getters[key] = initRasterSource(source);
 
+    if (source.type === "geotiff") getters[key] = initGeotiffSource(source);
+    
     if (source.type !== "vector") return;
 
     // Vector tiles: Get the layers using this source, and initialize mixer
