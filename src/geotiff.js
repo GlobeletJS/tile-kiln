@@ -4,7 +4,7 @@ export function initGeotiffSource(source) {
   const getURL = initUrlFunc(source.tiles);
 
   function request({z, x, y, callback}) {
-    var z_gdal = source.maxzoom-z;
+    var z_gdal = source.maxzoom-z+1;
     var x_gdal = y+1;
     var y_gdal = x+1;
     if (z>3 & x_gdal<10){x_gdal = "0"+x_gdal;}
