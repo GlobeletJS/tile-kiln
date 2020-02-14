@@ -3,6 +3,7 @@ export function initRasterSource(source) {
 
   function request({z, x, y, callback}) {
     const href = getURL(z, x, y);
+    console.log("z:"+z);
     const errMsg = "ERROR in loadImage for href " + href;
 
     const img = new Image();

@@ -1,6 +1,7 @@
 'use strict';
 
 import * as tilekiln from "../../dist/tile-kiln.bundle.js";
+import { initMapControl } from "./map-control.js";
 
 export function main() {
   tilekiln.init({
@@ -19,10 +20,23 @@ function setup(api) {
   canvas.width = canvas.height = 512;
   const dctx = canvas.getContext("2d");
 
-  api.create(5, 8, 12, displayTile);
+  //  api.create(5, 8, 12, displayTile);
+
+  // Get a link to the tile coordinates printout
+  var title = document.getElementById("zxy");
+  const coords = { z: 5, x: 6, y: 12 };
+
+  // Get first tile, setup map position control
+  var currentTile = api.create(coords.z, coords.x, coords.y, displayTile);
+  initMapControl(coords, update);
 
   function displayTile(err, tile) {
     if (err) return console.log(err);
     dctx.drawImage(tile.img, 0, 0);
+  }
+
+  // Define misc functions
+  function update() {
+    currentTile = api.create(coords.z, coords.x, coords.y, displayTile);
   }
 }

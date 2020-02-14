@@ -1173,6 +1173,7 @@ function initRasterSource(source) {
 
   function request({z, x, y, callback}) {
     const href = getURL(z, x, y);
+    console.log("z:"+z);
     const errMsg = "ERROR in loadImage for href " + href;
 
     const img = new Image();
@@ -24513,8 +24514,8 @@ function initGeotiffSource(source) {
     var y_gdal = x+1;
     if (z>3 & x_gdal<10){x_gdal = "0"+x_gdal;}
     if (z>3 & y_gdal<10){y_gdal = "0"+y_gdal;}
+    console.log("z:"+ z + ", z_gdal:"+z_gdal);
     const href = getURL(z_gdal, x_gdal, y_gdal);
-    console.log(href);
    
     var tileValues=[];
     var t0, t1;
@@ -24531,9 +24532,13 @@ function initGeotiffSource(source) {
         console.log("loadGeoTiff: time = " + time);
         callback(null, tileValues);
       })
-      .catch(err => callback(err));
+      .catch(errMsg => callback(errMsg));
 
-    return tileValues;
+    //return tileValues;
+    const reqHandle = {};
+    reqHandle.abort = () => { };
+
+    return reqHandle;
   }
 
   return { request };

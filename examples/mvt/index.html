@@ -17,7 +17,30 @@
   </head>
 
   <body onload="app.main()">
-    <canvas id="map" class="display-canvas"></canvas>
+    <div class="leftSide">
+      <p id="zxy">Tile coordinates</p>
+      <div class="container">
+        <div id="topleft">
+          <button id="zoomOut" class="nav">-</button>
+          <button id="zoomIn" class="nav">+</button>
+        </div>
+        <button id="up" class="nav">^</button>
+        <button id="left" class="nav">&lt;</button>
+        <button id="right" class="nav">&gt;</button>
+        <button id="down" class="nav">v</button>
+        <canvas id="map" class="display-canvas"></canvas>
+      </div>
+      <p>
+      <button id="toggleBurwell">Toggle Burwell Polygon Visibility</button>
+      <button id="toggleLabels">Toggle Label Visibility</button>
+      </p>
+    </div>
+
+    <div id="info">Feature info will appear here</div>
   </body>
+
+  <!-- <body onload="app.main()">
+    <canvas id="map" class="display-canvas"></canvas>
+    </body>-->
 
 </html>
