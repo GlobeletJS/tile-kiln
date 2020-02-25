@@ -28,7 +28,7 @@ function setup(api) {
 
   function displayTile(err, tile) {
     if (err) return console.log(err);
-    dctx.drawImage(tile.img, 0, 0);
+    dctx.drawImage(tile.img, tile.xIndex, tile.yIndex, tile.cropSize, tile.cropSize, 0, 0, 512, 512);
   }
   
   // Define misc functions

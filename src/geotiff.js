@@ -4,12 +4,26 @@ export function initGeotiffSource(source) {
   const getURL = initUrlFunc(source.tiles);
 
   function request({z, x, y, callback}) {
-    var z_gdal = source.maxzoom-z+1;
-    var x_gdal = y+1;
-    var y_gdal = x+1;
+    var z_gdal, x_gdal, y_gdal;
+    var zoomOverMax = 0; //Difference between maxzoom and current zoom when zoom>max;
+    
+    if(z>source.maxzoom)
+    {
+      console.log("z is greater than maxzoom");
+      zoomOverMax = z-source.maxzoom;
+      z_gdal=1;//!!!Need tochange this to 0 after regenerating gdal tiles without the pyramidOnly option
+      x_gdal=Math.floor(y/Math.pow(2, zoomOverMax))+1;
+      y_gdal=Math.floor(x/Math.pow(2, zoomOverMax))+1;
+      console.log("Requested z/x/y: "+z+"/"+x+"/"+y);
+      console.log("Fetching z/x/y: "+source.maxzoom+"/"+(y_gdal-1)+"/"+(x_gdal-1));
+    }else{
+      z_gdal = source.maxzoom-z+1;///change to source.maxzoom-z after regenerating gdal tiles without the pyramidOnly option
+      x_gdal = y+1;
+      y_gdal = x+1;
+    }
     if (z>3 & x_gdal<10){x_gdal = "0"+x_gdal;}
     if (z>3 & y_gdal<10){y_gdal = "0"+y_gdal;}
-    console.log("z:"+ z + ", z_gdal:"+z_gdal);
+    console.log("z_gdal/x_gdal/y_gdal: "+z_gdal+"/"+x_gdal+"/"+y_gdal);
     const href = getURL(z_gdal, x_gdal, y_gdal);
     const errMsg = "ERROR in loadImage for href " + href;
    
