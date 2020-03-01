@@ -1709,6 +1709,7 @@ function initRenderer(styleDoc, canvasSize, queue) {
   }
 
   function drawLayers(tile, callback) {
+    if (tile.canceled) return;
     const bboxes = [];
 
     layers.forEach(layer => {
@@ -1718,6 +1719,7 @@ function initRenderer(styleDoc, canvasSize, queue) {
 
     tile.rendered = true;
     tile.rendering = false;
+    tile.cancel = () => false;
 
     return callback(null, tile);
   }
@@ -1730,7 +1732,13 @@ function initRenderer(styleDoc, canvasSize, queue) {
 
     const getPriority = () => tile.priority;
     const chunks = [ () => drawLayers(tile, callback) ];
-    queue.enqueueTask({ getPriority, chunks });
+    const renderTaskId = queue.enqueueTask({ getPriority, chunks });
+
+    tile.cancel = () => { // Is this necessary?
+      queue.cancelTask(renderTaskId);
+      tile.rendering = false; // TODO: unnecessary?
+      tile.canceled = true;
+    };
   }
 
   return {
