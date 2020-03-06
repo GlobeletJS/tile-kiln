@@ -715,7 +715,7 @@ function initZeroTimeouts() {
   };
 }
 
-function initChunkQueue() {
+function init() {
   const tasks = [];
   var taskId = 0;
   var queueIsRunning = false;
@@ -809,7 +809,7 @@ function initZeroTimeouts$1() {
   };
 }
 
-function initChunkQueue$1() {
+function init$1() {
   const tasks = [];
   var taskId = 0;
   var queueIsRunning = false;
@@ -886,7 +886,7 @@ function setParams(userParams) {
   // Construct the task queue, if not supplied
   const queue = (userParams.queue)
     ? userParams.queue
-    : initChunkQueue$1();
+    : init$1();
 
   return {
     threads,
@@ -1748,7 +1748,7 @@ function initRenderer(styleDoc, canvasSize, queue) {
   };
 }
 
-function init(params) {
+function init$2(params) {
   // Process parameters, substituting defaults as needed
   var canvSize = params.size || 512;
   var styleURL = params.style;   // REQUIRED
@@ -1772,7 +1772,7 @@ function init(params) {
 }
 
 function setup(styleDoc, canvSize, nThreads, api) {
-  const queue = initChunkQueue();
+  const queue = init();
   const orderTile = initTileFactory(styleDoc, canvSize, queue, nThreads);
   const renderer = initRenderer(styleDoc, canvSize, queue);
 
@@ -1806,4 +1806,4 @@ function setup(styleDoc, canvSize, nThreads, api) {
   return api;
 }
 
-export { init };
+export { init$2 as init };

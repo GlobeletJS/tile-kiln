@@ -1,5 +1,5 @@
 import { loadStyle } from 'tile-stencil';
-import { initChunkQueue } from "./queue.js";
+import * as chunkedQueue from 'chunked-queue';
 import { initTileFactory } from "./tile.js";
 import { initRenderer } from "./renderer.js";
 
@@ -27,7 +27,7 @@ export function init(params) {
 }
 
 function setup(styleDoc, canvSize, nThreads, api) {
-  const queue = initChunkQueue();
+  const queue = chunkedQueue.init();
   const orderTile = initTileFactory(styleDoc, canvSize, queue, nThreads);
   const renderer = initRenderer(styleDoc, canvSize, queue);
 
