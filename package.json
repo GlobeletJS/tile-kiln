@@ -11,11 +11,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "npm run build-module && npm run build-examples",
-    "build-module": "rollup -c build/rollup.config.js && npm run copy-worker",
-    "copy-worker": "cp node_modules/tile-mixer/dist/worker.bundle.js dist/",
-    "build-examples": "npm run rollup-examples && npm run examples-worker",
-    "rollup-examples": "cd examples && rollup -c",
-    "examples-worker": "echo examples/*/ | xargs -n 1 cp dist/worker.bundle.js",
+    "build-module": "rollup -c build/rollup.config.js",
+    "build-examples": "cd examples && rollup -c",
     "postversion": "git push && git push --tags"
   },
   "repository": {
@@ -46,10 +43,8 @@
   },
   "dependencies": {
     "chunked-queue": "0.0.1",
-    "pbf": "^3.2.1",
-    "tile-mixer": "0.0.2",
-    "tile-painter": "^0.1.2",
-    "tile-stencil": "^0.2.0",
-    "vector-tile-esm": "^2.1.0"
+    "tile-mixer": "0.0.3",
+    "tile-painter": "^0.2.1",
+    "tile-stencil": "^0.2.1"
   }
 }
