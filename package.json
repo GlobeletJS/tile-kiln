@@ -42,8 +42,8 @@
     "touch-sampler": "0.0.1"
   },
   "dependencies": {
-    "chunked-queue": "0.0.1",
-    "tile-mixer": "0.0.3",
+    "chunked-queue": "^0.1.1",
+    "tile-mixer": "0.0.7",
     "tile-painter": "^0.2.1",
     "tile-stencil": "^0.2.1"
   }
