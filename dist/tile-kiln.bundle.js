@@ -24511,27 +24511,44 @@ function initGeotiffSource(source) {
   function request({z, x, y, callback}) {
     var z_gdal, x_gdal, y_gdal;
     var zoomOverMax = 0; //Difference between maxzoom and current zoom when zoom>max;
+    var cropSize = 512; //Crop parameters for when zoom>maxzoom
+    var xIndex = 0; //Crop parameters for when zoom>maxzoom 
+    var yIndex = 0; //Crop parameters for when zoom>maxzoom 
     
     if(z>source.maxzoom)
     {
       console.log("z is greater than maxzoom");
       zoomOverMax = z-source.maxzoom;
-      z_gdal=1;//!!!Need tochange this to 0 after regenerating gdal tiles without the pyramidOnly option
+      //z_gdal=1;//!!!Need tochange this to 0 after regenerating gdal tiles without the pyramidOnly option
+      z_gdal=0;
       x_gdal=Math.floor(y/Math.pow(2, zoomOverMax))+1;
       y_gdal=Math.floor(x/Math.pow(2, zoomOverMax))+1;
       console.log("Requested z/x/y: "+z+"/"+x+"/"+y);
       console.log("Fetching z/x/y: "+source.maxzoom+"/"+(y_gdal-1)+"/"+(x_gdal-1));
+      
+      //Compute crop parameters
+      cropSize = 512/Math.pow(2, zoomOverMax);
+      xIndex = (x%(Math.pow(2, zoomOverMax)))*cropSize;
+      yIndex = (y%(Math.pow(2, zoomOverMax)))*cropSize;
+      console.log("zoomOverMax:"+zoomOverMax+", xIndex:"+xIndex+", yIndex:"+yIndex+", cropSize:"+cropSize);
     }else{
-      z_gdal = source.maxzoom-z+1;///change to source.maxzoom-z after regenerating gdal tiles without the pyramidOnly option
+      //z_gdal = source.maxzoom-z+1;///change to source.maxzoom-z after regenerating gdal tiles without the pyramidOnly option
+      z_gdal = source.maxzoom-z;
       x_gdal = y+1;
       y_gdal = x+1;
     }
-    if (z>3 & x_gdal<10){x_gdal = "0"+x_gdal;}
-    if (z>3 & y_gdal<10){y_gdal = "0"+y_gdal;}
+    //To-do: This is specific to the quarter globe tiles!!!
+    if (z>4 & z<8 & x_gdal<10){x_gdal = "0"+x_gdal;}
+    if (z>4 & z<8 & y_gdal<10){y_gdal = "0"+y_gdal;}
+    if (z>7 & x_gdal<10){x_gdal = "00"+x_gdal;}
+    if (z>7 & y_gdal<10){y_gdal = "00"+y_gdal;}
+    if (z>7 & x_gdal>9 & x_gdal<100){x_gdal = "0"+x_gdal;}
+    if (z>7 & y_gdal>9 & y_gdal<100){y_gdal = "0"+y_gdal;}
     console.log("z_gdal/x_gdal/y_gdal: "+z_gdal+"/"+x_gdal+"/"+y_gdal);
     const href = getURL(z_gdal, x_gdal, y_gdal);
    
     var tileValues=[];
+    var subTileValues=[];
     var t0, t1;
     GeoTIFF.fromUrl(href)
       .then( tiff => {
@@ -24544,7 +24561,18 @@ function initGeotiffSource(source) {
         t1 = performance.now();
         let time = (t1 - t0).toFixed(3) + "ms";
         console.log("loadGeoTiff: time = " + time);
-        callback(null, tileValues);
+        if(z>source.maxzoom){
+          let k=0;
+          for(let i=yIndex; i<(yIndex+cropSize); i++){
+            for(let j=xIndex; j<(xIndex+cropSize); j++){
+              subTileValues[k]=tileValues[(i*512)+j];
+              k++;
+            }
+          }
+          callback(null, subTileValues);
+        }else{
+          callback(null, tileValues);
+        }
       })
       .catch(errMsg => callback(errMsg));
 
@@ -24642,10 +24670,10 @@ function initTileFactory(styleDoc, canvasSize, queue, nThreads) {
       z, x, y,
       id: z + "/" + x + "/" + y,
       priority: 0,
-      zoomOverMax: 0, //Options to stretch image when z>maxzoom
-      xIndex: 0,  
-      yIndex: 0,
-      cropSize: 512,
+  //    zoomOverMax: 0, //Options to stretch image when z>maxzoom
+  //    xIndex: 0,  
+  //    yIndex: 0,
+  //    cropSize: 512,
 
       img,
       ctx: img.getContext("2d"),
@@ -24667,12 +24695,12 @@ function initTileFactory(styleDoc, canvasSize, queue, nThreads) {
       if (err) console.log(err);
       tile.sources = data;
       tile.loaded = true;
-      if(z> styleDoc.sources[Object.getOwnPropertyNames(data)[0]].maxzoom){
-        tile.zoomOverMax = z- styleDoc.sources[Object.getOwnPropertyNames(data)[0]].maxzoom;
-        tile.cropSize = 512/Math.pow(2, tile.zoomOverMax);
-        tile.xIndex = (tile.x%(Math.pow(2, tile.zoomOverMax)))*tile.cropSize;
-        tile.yIndex = (tile.y%(Math.pow(2, tile.zoomOverMax)))*tile.cropSize;
-      }
+     // if(z> styleDoc.sources[Object.getOwnPropertyNames(data)[0]].maxzoom){
+       // tile.zoomOverMax = z- styleDoc.sources[Object.getOwnPropertyNames(data)[0]].maxzoom;
+       // tile.cropSize = 512/Math.pow(2, tile.zoomOverMax);
+       // tile.xIndex = (tile.x%(Math.pow(2, tile.zoomOverMax)))*tile.cropSize;
+       // tile.yIndex = (tile.y%(Math.pow(2, tile.zoomOverMax)))*tile.cropSize;
+      //}
       return callback(null, tile);
     }
     return tile;
@@ -24701,6 +24729,9 @@ function initRasterFill(layout, paint, canvSize) {
 
 function initGeoTiff(layout, paint, canvSize) {
   return function(ctx, zoom, data) {
+    var tileSize = Math.sqrt(data.length);
+    ctx.canvas.width = tileSize;
+    ctx.canvas.height = tileSize;
     // paint pixel values onto canvas with Plotty
     //If colorbar-type=log, compute log of the data, plot on a log scale
     if (paint["colorbar-type"]() === "log"){
@@ -24710,13 +24741,13 @@ function initGeoTiff(layout, paint, canvSize) {
       }
       var plot = new plotty.plot({
         canvas: ctx.canvas,
-        data: logData, width: canvSize, height: canvSize,
+        data: logData, width: tileSize, height: tileSize,
         domain: [Math.log(paint["colorbar-min"]()), Math.log(paint["colorbar-max"]())], colorScale: paint["colorbar"]()
       });
     }else if (paint["colorbar-type"] === "linear"){
       var plot = new plotty.plot({
         canvas: ctx.canvas,
-        data: data, width: canvSize, height: canvSize,
+        data: data, width: tileSize, height: tileSize,
         domain: [(paint["colorbar-min"]()), (paint["colorbar-max"]())], colorScale: paint["colorbar"]()
       });
     }
@@ -25050,7 +25081,7 @@ function makePaintFunction(style, sprite, canvasSize) {
     case "fill":
       return initFill(style.layout, style.paint, sprite);
     case "geotiff":
-      return initGeoTiff(style.layout, style.paint, canvasSize);
+      return initGeoTiff(style.layout, style.paint);
     case "fill-extrusion":
     case "heatmap":
     case "hillshade":

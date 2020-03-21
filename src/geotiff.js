@@ -6,28 +6,45 @@ export function initGeotiffSource(source) {
   function request({z, x, y, callback}) {
     var z_gdal, x_gdal, y_gdal;
     var zoomOverMax = 0; //Difference between maxzoom and current zoom when zoom>max;
+    var cropSize = 512; //Crop parameters for when zoom>maxzoom
+    var xIndex = 0; //Crop parameters for when zoom>maxzoom 
+    var yIndex = 0; //Crop parameters for when zoom>maxzoom 
     
     if(z>source.maxzoom)
     {
       console.log("z is greater than maxzoom");
       zoomOverMax = z-source.maxzoom;
-      z_gdal=1;//!!!Need tochange this to 0 after regenerating gdal tiles without the pyramidOnly option
+      //z_gdal=1;//!!!Need tochange this to 0 after regenerating gdal tiles without the pyramidOnly option
+      z_gdal=0;
       x_gdal=Math.floor(y/Math.pow(2, zoomOverMax))+1;
       y_gdal=Math.floor(x/Math.pow(2, zoomOverMax))+1;
       console.log("Requested z/x/y: "+z+"/"+x+"/"+y);
       console.log("Fetching z/x/y: "+source.maxzoom+"/"+(y_gdal-1)+"/"+(x_gdal-1));
+      
+      //Compute crop parameters
+      cropSize = 512/Math.pow(2, zoomOverMax);
+      xIndex = (x%(Math.pow(2, zoomOverMax)))*cropSize;
+      yIndex = (y%(Math.pow(2, zoomOverMax)))*cropSize;
+      console.log("zoomOverMax:"+zoomOverMax+", xIndex:"+xIndex+", yIndex:"+yIndex+", cropSize:"+cropSize);
     }else{
-      z_gdal = source.maxzoom-z+1;///change to source.maxzoom-z after regenerating gdal tiles without the pyramidOnly option
+      //z_gdal = source.maxzoom-z+1;///change to source.maxzoom-z after regenerating gdal tiles without the pyramidOnly option
+      z_gdal = source.maxzoom-z;
       x_gdal = y+1;
       y_gdal = x+1;
     }
-    if (z>3 & x_gdal<10){x_gdal = "0"+x_gdal;}
-    if (z>3 & y_gdal<10){y_gdal = "0"+y_gdal;}
+    //To-do: This is specific to the quarter globe tiles!!!
+    if (z>4 & z<8 & x_gdal<10){x_gdal = "0"+x_gdal;}
+    if (z>4 & z<8 & y_gdal<10){y_gdal = "0"+y_gdal;}
+    if (z>7 & x_gdal<10){x_gdal = "00"+x_gdal;}
+    if (z>7 & y_gdal<10){y_gdal = "00"+y_gdal;}
+    if (z>7 & x_gdal>9 & x_gdal<100){x_gdal = "0"+x_gdal;}
+    if (z>7 & y_gdal>9 & y_gdal<100){y_gdal = "0"+y_gdal;}
     console.log("z_gdal/x_gdal/y_gdal: "+z_gdal+"/"+x_gdal+"/"+y_gdal);
     const href = getURL(z_gdal, x_gdal, y_gdal);
     const errMsg = "ERROR in loadImage for href " + href;
    
     var tileValues=[];
+    var subTileValues=[];
     var t0, t1;
     GeoTIFF.fromUrl(href)
       .then( tiff => {
@@ -40,7 +57,18 @@ export function initGeotiffSource(source) {
         t1 = performance.now();
         let time = (t1 - t0).toFixed(3) + "ms";
         console.log("loadGeoTiff: time = " + time);
-        callback(null, tileValues);
+        if(z>source.maxzoom){
+          let k=0;
+          for(let i=yIndex; i<(yIndex+cropSize); i++){
+            for(let j=xIndex; j<(xIndex+cropSize); j++){
+              subTileValues[k]=tileValues[(i*512)+j];
+              k++;
+            }
+          }
+          callback(null, subTileValues);
+        }else{
+          callback(null, tileValues);
+        }
       })
       .catch(errMsg => callback(errMsg));
 

@@ -10,10 +10,10 @@
     "bedrock": {
       "type": "geotiff",
       "tiles": [
-        "https://s3.amazonaws.com/cogs.earthpeel.com/gdaltiles_250m_0228/{z}/BDTICM_M_250m_ll_srs3857_0228_{x}_{y}.tif"
+        "https://s3.amazonaws.com/cogs.earthpeel.com/gdaltiles_1km_v8/{z}/BDTICM_M_1km_ll_srs3857c_{x}_{y}.tif"
       ],
       "tileSize": 512,
-      "maxzoom": 8
+      "maxzoom": 5
     }
   },
   "sprite": "",
@@ -23,7 +23,7 @@
     { "id": "bedrock",
       "type": "geotiff",
       "source": "bedrock",
-      "maxzoom": 8,
+      "maxzoom": 5,
       "layout": {
         "visibility":"visible"
       },
