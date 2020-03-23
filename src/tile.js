@@ -12,10 +12,6 @@ export function initTileFactory(styleDoc, canvasSize, queue, nThreads) {
       z, x, y,
       id: z + "/" + x + "/" + y,
       priority: 0,
-  //    zoomOverMax: 0, //Options to stretch image when z>maxzoom
-  //    xIndex: 0,  
-  //    yIndex: 0,
-  //    cropSize: 512,
 
       img,
       ctx: img.getContext("2d"),
@@ -37,12 +33,6 @@ export function initTileFactory(styleDoc, canvasSize, queue, nThreads) {
       if (err) console.log(err);
       tile.sources = data;
       tile.loaded = true;
-     // if(z> styleDoc.sources[Object.getOwnPropertyNames(data)[0]].maxzoom){
-       // tile.zoomOverMax = z- styleDoc.sources[Object.getOwnPropertyNames(data)[0]].maxzoom;
-       // tile.cropSize = 512/Math.pow(2, tile.zoomOverMax);
-       // tile.xIndex = (tile.x%(Math.pow(2, tile.zoomOverMax)))*tile.cropSize;
-       // tile.yIndex = (tile.y%(Math.pow(2, tile.zoomOverMax)))*tile.cropSize;
-      //}
       return callback(null, tile);
     }
     return tile;

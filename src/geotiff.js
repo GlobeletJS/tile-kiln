@@ -12,9 +12,9 @@ export function initGeotiffSource(source) {
     
     if(z>source.maxzoom)
     {
+      //Determine the maxzoom tile that covers the requested tile
       console.log("z is greater than maxzoom");
       zoomOverMax = z-source.maxzoom;
-      //z_gdal=1;//!!!Need tochange this to 0 after regenerating gdal tiles without the pyramidOnly option
       z_gdal=0;
       x_gdal=Math.floor(y/Math.pow(2, zoomOverMax))+1;
       y_gdal=Math.floor(x/Math.pow(2, zoomOverMax))+1;
@@ -27,11 +27,11 @@ export function initGeotiffSource(source) {
       yIndex = (y%(Math.pow(2, zoomOverMax)))*cropSize;
       console.log("zoomOverMax:"+zoomOverMax+", xIndex:"+xIndex+", yIndex:"+yIndex+", cropSize:"+cropSize);
     }else{
-      //z_gdal = source.maxzoom-z+1;///change to source.maxzoom-z after regenerating gdal tiles without the pyramidOnly option
       z_gdal = source.maxzoom-z;
       x_gdal = y+1;
       y_gdal = x+1;
     }
+    
     //To-do: This is specific to the quarter globe tiles!!!
     if (z>4 & z<8 & x_gdal<10){x_gdal = "0"+x_gdal;}
     if (z>4 & z<8 & y_gdal<10){y_gdal = "0"+y_gdal;}
@@ -49,6 +49,8 @@ export function initGeotiffSource(source) {
     var stretchedTileValues=[];
     var ind = 0;
     var t0, t1;
+
+    //Fetch geotiff tile
     GeoTIFF.fromUrl(href)
       .then( tiff => {
         t0 = performance.now();
@@ -61,6 +63,7 @@ export function initGeotiffSource(source) {
         let time = (t1 - t0).toFixed(3) + "ms";
         console.log("loadGeoTiff: time = " + time);
         if(z>source.maxzoom){
+          //Crop the maxzoom tile to the zoomed-in area
           let k=0;
           for(let i=yIndex; i<(yIndex+cropSize); i++){
             for(let j=xIndex; j<(xIndex+cropSize); j++){
@@ -68,6 +71,7 @@ export function initGeotiffSource(source) {
               k++;
             }
           }
+          //Stretch cropped tile to 512x512 pixels
           for(let l=0; l<croppedTileValues.length; l++){
             ind = (cropRatio*(l%cropSize))+(cropRatio*512*Math.floor(l/cropSize));
             for(let m=0; m<cropRatio; m++){
@@ -83,13 +87,10 @@ export function initGeotiffSource(source) {
       })
       .catch(errMsg => callback(errMsg));
 
-    //return tileValues;
     const reqHandle = {};
     reqHandle.abort = () => { };
-
     return reqHandle;
   }
-
   return { request };
 }
 
