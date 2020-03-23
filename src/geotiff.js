@@ -44,7 +44,10 @@ export function initGeotiffSource(source) {
     const errMsg = "ERROR in loadImage for href " + href;
    
     var tileValues=[];
-    var subTileValues=[];
+    var cropRatio=512/cropSize;
+    var croppedTileValues=[];
+    var stretchedTileValues=[];
+    var ind = 0;
     var t0, t1;
     GeoTIFF.fromUrl(href)
       .then( tiff => {
@@ -61,11 +64,19 @@ export function initGeotiffSource(source) {
           let k=0;
           for(let i=yIndex; i<(yIndex+cropSize); i++){
             for(let j=xIndex; j<(xIndex+cropSize); j++){
-              subTileValues[k]=tileValues[(i*512)+j];
+              croppedTileValues[k]=tileValues[(i*512)+j];
               k++;
             }
           }
-          callback(null, subTileValues);
+          for(let l=0; l<croppedTileValues.length; l++){
+            ind = (cropRatio*(l%cropSize))+(cropRatio*512*Math.floor(l/cropSize));
+            for(let m=0; m<cropRatio; m++){
+              for (let n=0; n<cropRatio; n++){
+                stretchedTileValues[ind+((m*512)+n)]=croppedTileValues[l];
+              }
+            }
+          }
+          callback(null, stretchedTileValues);
         }else{
           callback(null, tileValues);
         }

@@ -24548,7 +24548,10 @@ function initGeotiffSource(source) {
     const href = getURL(z_gdal, x_gdal, y_gdal);
    
     var tileValues=[];
-    var subTileValues=[];
+    var cropRatio=512/cropSize;
+    var croppedTileValues=[];
+    var stretchedTileValues=[];
+    var ind = 0;
     var t0, t1;
     GeoTIFF.fromUrl(href)
       .then( tiff => {
@@ -24565,11 +24568,19 @@ function initGeotiffSource(source) {
           let k=0;
           for(let i=yIndex; i<(yIndex+cropSize); i++){
             for(let j=xIndex; j<(xIndex+cropSize); j++){
-              subTileValues[k]=tileValues[(i*512)+j];
+              croppedTileValues[k]=tileValues[(i*512)+j];
               k++;
             }
           }
-          callback(null, subTileValues);
+          for(let l=0; l<croppedTileValues.length; l++){
+            ind = (cropRatio*(l%cropSize))+(cropRatio*512*Math.floor(l/cropSize));
+            for(let m=0; m<cropRatio; m++){
+              for (let n=0; n<cropRatio; n++){
+                stretchedTileValues[ind+((m*512)+n)]=croppedTileValues[l];
+              }
+            }
+          }
+          callback(null, stretchedTileValues);
         }else{
           callback(null, tileValues);
         }
@@ -24729,9 +24740,6 @@ function initRasterFill(layout, paint, canvSize) {
 
 function initGeoTiff(layout, paint, canvSize) {
   return function(ctx, zoom, data) {
-    var tileSize = Math.sqrt(data.length);
-    ctx.canvas.width = tileSize;
-    ctx.canvas.height = tileSize;
     // paint pixel values onto canvas with Plotty
     //If colorbar-type=log, compute log of the data, plot on a log scale
     if (paint["colorbar-type"]() === "log"){
@@ -24741,13 +24749,13 @@ function initGeoTiff(layout, paint, canvSize) {
       }
       var plot = new plotty.plot({
         canvas: ctx.canvas,
-        data: logData, width: tileSize, height: tileSize,
+        data: logData, width: canvSize, height: canvSize,
         domain: [Math.log(paint["colorbar-min"]()), Math.log(paint["colorbar-max"]())], colorScale: paint["colorbar"]()
       });
     }else if (paint["colorbar-type"] === "linear"){
       var plot = new plotty.plot({
         canvas: ctx.canvas,
-        data: data, width: tileSize, height: tileSize,
+        data: data, width: canvSize, height: canvSize,
         domain: [(paint["colorbar-min"]()), (paint["colorbar-max"]())], colorScale: paint["colorbar"]()
       });
     }
@@ -25081,7 +25089,7 @@ function makePaintFunction(style, sprite, canvasSize) {
     case "fill":
       return initFill(style.layout, style.paint, sprite);
     case "geotiff":
-      return initGeoTiff(style.layout, style.paint);
+      return initGeoTiff(style.layout, style.paint, canvasSize);
     case "fill-extrusion":
     case "heatmap":
     case "hillshade":
