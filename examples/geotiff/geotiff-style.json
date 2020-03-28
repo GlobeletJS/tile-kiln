@@ -10,7 +10,7 @@
     "bedrock": {
       "type": "geotiff",
       "tiles": [
-        "https://s3.amazonaws.com/cogs.earthpeel.com/gdaltiles_250m_0228/{z}/BDTICM_M_250m_ll_srs3857_0228_{x}_{y}.tif"
+        "https://s3.amazonaws.com/cogs.earthpeel.com/gdaltiles_250m_0228rn/{z}/{x}/{y}.tif"
       ],
       "tileSize": 512,
       "maxzoom": 8

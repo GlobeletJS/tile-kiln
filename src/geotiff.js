@@ -4,7 +4,6 @@ export function initGeotiffSource(source) {
   const getURL = initUrlFunc(source.tiles);
 
   function request({z, x, y, callback}) {
-    var z_gdal, x_gdal, y_gdal;
     var zoomOverMax = 0; //Difference between maxzoom and current zoom when zoom>max;
     var cropSize = 512; //Crop parameters for when zoom>maxzoom
     var xIndex = 0; //Crop parameters for when zoom>maxzoom 
@@ -14,33 +13,21 @@ export function initGeotiffSource(source) {
     {
       //Determine the maxzoom tile that covers the requested tile
       console.log("z is greater than maxzoom");
-      zoomOverMax = z-source.maxzoom;
-      z_gdal=0;
-      x_gdal=Math.floor(y/Math.pow(2, zoomOverMax))+1;
-      y_gdal=Math.floor(x/Math.pow(2, zoomOverMax))+1;
       console.log("Requested z/x/y: "+z+"/"+x+"/"+y);
-      console.log("Fetching z/x/y: "+source.maxzoom+"/"+(y_gdal-1)+"/"+(x_gdal-1));
+      zoomOverMax = z-source.maxzoom;
+      z=source.maxzoom;
+      x=Math.floor(x/Math.pow(2, zoomOverMax));
+      y=Math.floor(y/Math.pow(2, zoomOverMax));
+      console.log("Fetching z/x/y: "+z+"/"+x+"/"+y);
       
       //Compute crop parameters
       cropSize = 512/Math.pow(2, zoomOverMax);
       xIndex = (x%(Math.pow(2, zoomOverMax)))*cropSize;
       yIndex = (y%(Math.pow(2, zoomOverMax)))*cropSize;
       console.log("zoomOverMax:"+zoomOverMax+", xIndex:"+xIndex+", yIndex:"+yIndex+", cropSize:"+cropSize);
-    }else{
-      z_gdal = source.maxzoom-z;
-      x_gdal = y+1;
-      y_gdal = x+1;
     }
     
-    //To-do: This is specific to the quarter globe tiles!!!
-    if (z>4 & z<8 & x_gdal<10){x_gdal = "0"+x_gdal;}
-    if (z>4 & z<8 & y_gdal<10){y_gdal = "0"+y_gdal;}
-    if (z>7 & x_gdal<10){x_gdal = "00"+x_gdal;}
-    if (z>7 & y_gdal<10){y_gdal = "00"+y_gdal;}
-    if (z>7 & x_gdal>9 & x_gdal<100){x_gdal = "0"+x_gdal;}
-    if (z>7 & y_gdal>9 & y_gdal<100){y_gdal = "0"+y_gdal;}
-    console.log("z_gdal/x_gdal/y_gdal: "+z_gdal+"/"+x_gdal+"/"+y_gdal);
-    const href = getURL(z_gdal, x_gdal, y_gdal);
+    const href = getURL(z, x, y);
     const errMsg = "ERROR in loadImage for href " + href;
    
     var tileValues=[];
