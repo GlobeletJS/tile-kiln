@@ -24520,15 +24520,17 @@ function initGeotiffSource(source) {
       console.log("z is greater than maxzoom");
       console.log("Requested z/x/y: "+z+"/"+x+"/"+y);
       zoomOverMax = z-source.maxzoom;
-      z=source.maxzoom;
-      x=Math.floor(x/Math.pow(2, zoomOverMax));
-      y=Math.floor(y/Math.pow(2, zoomOverMax));
-      console.log("Fetching z/x/y: "+z+"/"+x+"/"+y);
       
       //Compute crop parameters
       cropSize = 512/Math.pow(2, zoomOverMax);
       xIndex = (x%(Math.pow(2, zoomOverMax)))*cropSize;
       yIndex = (y%(Math.pow(2, zoomOverMax)))*cropSize;
+      
+      z=source.maxzoom;
+      x=Math.floor(x/Math.pow(2, zoomOverMax));
+      y=Math.floor(y/Math.pow(2, zoomOverMax));
+      
+      console.log("Fetching z/x/y: "+z+"/"+x+"/"+y);
       console.log("zoomOverMax:"+zoomOverMax+", xIndex:"+xIndex+", yIndex:"+yIndex+", cropSize:"+cropSize);
     }
     
@@ -24553,7 +24555,7 @@ function initGeotiffSource(source) {
         t1 = performance.now();
         let time = (t1 - t0).toFixed(3) + "ms";
         console.log("loadGeoTiff: time = " + time);
-        if(z>source.maxzoom){
+        if(zoomOverMax>0){
           //Crop the maxzoom tile to the zoomed-in area
           let k=0;
           for(let i=yIndex; i<(yIndex+cropSize); i++){
