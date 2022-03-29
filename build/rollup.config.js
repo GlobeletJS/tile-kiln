@@ -1,5 +1,5 @@
-import resolve from 'rollup-plugin-node-resolve';
-import commonjs from 'rollup-plugin-commonjs'; // Yuck... remove when possible
+import resolve from '@rollup/plugin-node-resolve';
+import commonjs from '@rollup/plugin-commonjs'; // Yuck... remove when possible
 import pkg from "../package.json";
 
 export default [{

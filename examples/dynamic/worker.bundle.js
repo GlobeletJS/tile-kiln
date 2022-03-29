@@ -33,7 +33,9 @@ function xhrGet(href, type, callback) {
   return req;
 }
 
-var read = function (buffer, offset, isLE, mLen, nBytes) {
+var ieee754$1 = {};
+
+ieee754$1.read = function (buffer, offset, isLE, mLen, nBytes) {
   var e, m;
   var eLen = (nBytes * 8) - mLen - 1;
   var eMax = (1 << eLen) - 1;
@@ -66,7 +68,7 @@ var read = function (buffer, offset, isLE, mLen, nBytes) {
   return (s ? -1 : 1) * m * Math.pow(2, e - mLen)
 };
 
-var write = function (buffer, value, offset, isLE, mLen, nBytes) {
+ieee754$1.write = function (buffer, value, offset, isLE, mLen, nBytes) {
   var e, m, c;
   var eLen = (nBytes * 8) - mLen - 1;
   var eMax = (1 << eLen) - 1;
@@ -118,14 +120,9 @@ var write = function (buffer, value, offset, isLE, mLen, nBytes) {
   buffer[offset + i - d] |= s * 128;
 };
 
-var ieee754 = {
-	read: read,
-	write: write
-};
-
 var pbf = Pbf;
 
-
+var ieee754 = ieee754$1;
 
 function Pbf(buf) {
     this.buf = ArrayBuffer.isView && ArrayBuffer.isView(buf) ? buf : new Uint8Array(buf || 0);

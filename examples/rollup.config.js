@@ -1,6 +1,6 @@
 var fs = require('fs');
-import resolve from 'rollup-plugin-node-resolve';
-import json from 'rollup-plugin-json';
+import resolve from '@rollup/plugin-node-resolve';
+import json from '@rollup/plugin-json';
 
 // Get a list of the directory names
 const dirNames = fs
